@@ -1,0 +1,241 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.IO;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Windows.Media;
+using Microsoft.Win32;
+
+namespace GameLauncher
+{
+    public abstract class Notify : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected bool Set<T>(ref T field, T value, [CallerMemberName] string name = null)
+        {
+            if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+            field = value;
+            Raise(name);
+            return true;
+        }
+        protected void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    public class GameItem : Notify
+    {
+        public string Key { get; set; }
+        public string SortKey { get; set; }
+        public DateTime LastWrite { get; set; }
+        public int? SteamAppId { get; set; }
+        public int ArtVersion;
+        public string SearchKey { get; private set; } = "";
+        public string Initials { get; private set; } = "";
+
+        string _filePath, _name, _folder, _trainer;
+        ImageSource _icon, _cover;
+        List<string> _tags = new List<string>();
+        DateTime? _lastPlayed;
+
+        public string FilePath { get => _filePath; set => Set(ref _filePath, value); }
+        public string Name
+        {
+            get => _name;
+            set { if (Set(ref _name, value)) { SearchKey = Library.Normalize(value); Initials = Library.InitialsOf(value); } }
+        }
+        public string Folder { get => _folder; set { if (Set(ref _folder, value)) Raise(nameof(SubText)); } }
+        public ImageSource Icon { get => _icon; set => Set(ref _icon, value); }
+        public ImageSource Cover { get => _cover; set => Set(ref _cover, value); }
+        public string Trainer
+        {
+            get => _trainer;
+            set { if (Set(ref _trainer, value)) { Raise(nameof(HasTrainer)); Raise(nameof(TrainerTip)); } }
+        }
+        public bool HasTrainer => !string.IsNullOrEmpty(_trainer);
+        public string TrainerTip => HasTrainer ? "Play with trainer: " + Path.GetFileNameWithoutExtension(_trainer) : null;
+        public List<string> Tags { get => _tags; set { _tags = value ?? new List<string>(); Raise(nameof(Tags)); Raise(nameof(SubText)); } }
+        public DateTime? LastPlayed { get => _lastPlayed; set { if (Set(ref _lastPlayed, value)) Raise(nameof(SubText)); } }
+
+        bool _arranging, _isDragging;
+        public bool Arranging { get => _arranging; set => Set(ref _arranging, value); }
+        public bool IsDragging { get => _isDragging; set => Set(ref _isDragging, value); }
+
+        public string SubText
+        {
+            get
+            {
+                var parts = new List<string>();
+                if (_lastPlayed is DateTime d) parts.Add("Played " + Relative(d));
+                if (!string.IsNullOrEmpty(_folder)) parts.Add(_folder);
+                if (_tags.Count > 0) parts.Add(string.Join(", ", _tags));
+                if (parts.Count == 0)
+                    parts.Add(SteamAppId != null ? "Steam" : (_filePath != null && _filePath.EndsWith(".url", StringComparison.OrdinalIgnoreCase) ? "Link" : "Shortcut"));
+                return string.Join("  ·  ", parts);
+            }
+        }
+
+        static string Relative(DateTime d)
+        {
+            var days = (DateTime.Now.Date - d.Date).Days;
+            if (days <= 0) return "today";
+            if (days == 1) return "yesterday";
+            if (days < 30) return days + " days ago";
+            return d.ToString("d MMM yyyy");
+        }
+    }
+
+    public class LauncherItem : Notify
+    {
+        ImageSource _icon;
+        public string Name { get; set; }
+        public string FilePath { get; set; }
+        public DateTime LastWrite { get; set; }
+        public ImageSource Icon { get => _icon; set => Set(ref _icon, value); }
+    }
+
+    public record TabVm(string Label, string Value);
+
+    public class WallpaperRow : Notify
+    {
+        bool _isCurrent;
+        public string Label { get; set; }
+        public string Key { get; set; }
+        public string Note { get; set; }
+        public ImageSource Thumb { get; set; }
+        public bool HasImage => Thumb != null;
+        public bool IsCurrent { get => _isCurrent; set => Set(ref _isCurrent, value); }
+    }
+
+    public class GameData
+    {
+        public List<string> Tags { get; set; }
+        /// <summary>null = auto-detect, "" = no trainer, otherwise a path.</summary>
+        public string Trainer { get; set; }
+        public DateTime? LastPlayed { get; set; }
+        public int PlayCount { get; set; }
+        public int? SteamAppId { get; set; }
+        public bool SteamLookupDone { get; set; }
+        public string CustomCover { get; set; }
+        public bool NoCover { get; set; }
+    }
+
+    public class Settings
+    {
+        /// <summary>The shortcuts folder to show. Empty on first run: the settings panel opens so the user can pick one.</summary>
+        public string Folder { get; set; } = "";
+        public string Hotkey { get; set; } = "Win+Shift+G";
+        public int TrainerDelaySeconds { get; set; } = 10;
+        public bool HideOnLaunch { get; set; } = true;
+        public bool HideOnFocusLoss { get; set; } = false;
+        public bool CloseToTray { get; set; } = true;
+        public bool FetchCovers { get; set; } = true;
+        public double Width { get; set; } = 1180;
+        public double Height { get; set; } = 760;
+        public double TileMinWidth { get; set; } = 220;
+        public string DefaultTab { get; set; } = "games";
+        /// <summary>Subfolders whose shortcuts are not games (excluded from the Games filter).</summary>
+        public List<string> NonGameFolders { get; set; } = new List<string> { "Tools" };
+        /// <summary>Filter value ("games", "all", "folder:Tools", "tag:coop", or "*" for default) → image path.</summary>
+        public Dictionary<string, string> Wallpapers { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>Custom game order (keys). Empty = alphabetical. Games not listed go to the end.</summary>
+        public List<string> CustomOrder { get; set; } = new List<string>();
+        public double WallpaperDim { get; set; } = 0.5;
+        public double WallpaperBlur { get; set; } = 0;
+        public Dictionary<string, GameData> Games { get; set; } = new Dictionary<string, GameData>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    public static class Store
+    {
+        public static string Dir => AppContext.BaseDirectory;
+        public static string FilePath => Path.Combine(Dir, "launcher-data.json");
+        public static string CoverDir
+        {
+            get { var d = Path.Combine(Dir, "covers"); Directory.CreateDirectory(d); return d; }
+        }
+        public static string WallpaperDir
+        {
+            get { var d = Path.Combine(Dir, "wallpapers"); Directory.CreateDirectory(d); return d; }
+        }
+        public static Settings S { get; private set; } = new Settings();
+
+        static readonly JsonSerializerOptions Opt = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        static readonly object Lock = new object();
+
+        public static void Load()
+        {
+            Settings s = null;
+            try { if (File.Exists(FilePath)) s = JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath), Opt); }
+            catch { }
+            s ??= new Settings();
+            s.Games = new Dictionary<string, GameData>(s.Games ?? new Dictionary<string, GameData>(), StringComparer.OrdinalIgnoreCase);
+            s.Wallpapers = new Dictionary<string, string>(s.Wallpapers ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+            s.NonGameFolders ??= new List<string> { "Tools" };
+            s.CustomOrder ??= new List<string>();
+            if (string.IsNullOrWhiteSpace(s.DefaultTab)) s.DefaultTab = "games";
+            s.TileMinWidth = Math.Clamp(s.TileMinWidth <= 0 ? 220 : s.TileMinWidth, 150, 420);
+            S = s;
+        }
+
+        public static void Save()
+        {
+            lock (Lock)
+            {
+                try
+                {
+                    var tmp = FilePath + ".tmp";
+                    File.WriteAllText(tmp, JsonSerializer.Serialize(S, Opt));
+                    File.Move(tmp, FilePath, true);
+                }
+                catch { }
+            }
+        }
+
+        public static GameData Find(string key) => key != null && S.Games.TryGetValue(key, out var g) ? g : null;
+
+        public static GameData Game(string key)
+        {
+            if (!S.Games.TryGetValue(key, out var g)) { g = new GameData(); S.Games[key] = g; }
+            return g;
+        }
+
+        public static void Move(string oldKey, string newKey)
+        {
+            if (oldKey == null || newKey == null || string.Equals(oldKey, newKey, StringComparison.OrdinalIgnoreCase)) return;
+            if (S.Games.TryGetValue(oldKey, out var g) && !S.Games.ContainsKey(newKey))
+            {
+                S.Games[newKey] = g;
+                S.Games.Remove(oldKey);
+            }
+            MoveOrderKey(oldKey, newKey);
+        }
+
+        public static void MoveOrderKey(string oldKey, string newKey)
+        {
+            int i = S.CustomOrder.FindIndex(k => string.Equals(k, oldKey, StringComparison.OrdinalIgnoreCase));
+            if (i >= 0 && !S.CustomOrder.Contains(newKey, StringComparer.OrdinalIgnoreCase)) S.CustomOrder[i] = newKey;
+        }
+    }
+
+    public static class StartupReg
+    {
+        const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        const string Name = "GameLauncher";
+        public static bool IsEnabled()
+        {
+            using var k = Registry.CurrentUser.OpenSubKey(RunKey);
+            return k?.GetValue(Name) != null;
+        }
+        public static void Set(bool on)
+        {
+            using var k = Registry.CurrentUser.CreateSubKey(RunKey);
+            if (on) k.SetValue(Name, $"\"{Environment.ProcessPath}\" --tray");
+            else k.DeleteValue(Name, false);
+        }
+    }
+}

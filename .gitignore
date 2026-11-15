@@ -1,0 +1,16 @@
+# Build output
+bin/
+obj/
+app/
+publish/
+*.user
+.vs/
+.vscode/
+.idea/
+
+# Runtime data written next to the exe (personal: library, paths, play history, images)
+launcher-data.json
+launcher-data.json.tmp
+covers/
+wallpapers/
+error.log
