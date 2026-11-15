@@ -158,6 +158,8 @@ namespace GameLauncher
         public List<string> CustomOrder { get; set; } = new List<string>();
         /// <summary>Custom filter-tab order (tab values). Empty = default order. Tabs not listed go to the end.</summary>
         public List<string> TabOrder { get; set; } = new List<string>();
+        /// <summary>Custom launcher-bar order (shortcut file names without extension). Empty = alphabetical. Others go to the end.</summary>
+        public List<string> LauncherOrder { get; set; } = new List<string>();
         /// <summary>"landscape" (Steam header art) or "portrait" (Steam library art).</summary>
         public string CardLayout { get; set; } = "landscape";
         public bool ShowCardText { get; set; } = true;
@@ -198,6 +200,7 @@ namespace GameLauncher
             s.NonGameFolders ??= new List<string> { "Tools" };
             s.CustomOrder ??= new List<string>();
             s.TabOrder ??= new List<string>();
+            s.LauncherOrder ??= new List<string>();
             if (s.CardLayout != "portrait") s.CardLayout = "landscape";
             if (string.IsNullOrWhiteSpace(s.DefaultTab)) s.DefaultTab = "games";
             s.TileMinWidth = Math.Clamp(s.TileMinWidth <= 0 ? 220 : s.TileMinWidth, 150, 420);

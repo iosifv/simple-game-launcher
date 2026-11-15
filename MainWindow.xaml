@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
-        Title="Game Launcher" Width="1180" Height="760" MinWidth="640" MinHeight="420"
+        Title="Simple Game Launcher" Width="1180" Height="760" MinWidth="640" MinHeight="420"
         WindowStartupLocation="CenterScreen" Background="Transparent"
         Foreground="{StaticResource TextBrush}" Icon="app.ico" UseLayoutRounding="True"
         PreviewKeyDown="OnPreviewKeyDown" PreviewTextInput="OnPreviewTextInput">
@@ -410,13 +410,16 @@
             <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Image Source="app.ico" Width="20" Height="20" Margin="18,0,14,0" VerticalAlignment="Center"
-                       ToolTip="Game Launcher" />
-                <Grid Grid.Column="1" VerticalAlignment="Center" Margin="0,0,10,0" MaxWidth="900"
+                <Image Source="app.ico" Width="20" Height="20" Margin="18,0,10,0" VerticalAlignment="Center" />
+                <!-- App name; part of the draggable title bar. Hidden when the window is narrow (OnSizeChanged). -->
+                <TextBlock x:Name="AppTitle" Grid.Column="1" Text="Simple Game Launcher" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource SecondaryBrush}" VerticalAlignment="Center" Margin="0,0,18,1" />
+                <Grid Grid.Column="2" VerticalAlignment="Center" Margin="0,0,10,0" MaxWidth="900"
                       HorizontalAlignment="Stretch">
                     <TextBox x:Name="SearchBox" FontSize="14" Padding="36,6,12,6" VerticalContentAlignment="Center"
                              TextChanged="SearchBox_TextChanged" WindowChrome.IsHitTestVisibleInChrome="True" />
@@ -430,13 +433,13 @@
                                Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right"
                                VerticalAlignment="Center" Margin="0,0,14,0" IsHitTestVisible="False" />
                 </Grid>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Style="{StaticResource HeaderBtn}" Content="&#xE72C;" ToolTip="Rescan folder (F5)" Click="Refresh_Click" />
                     <Button Style="{StaticResource HeaderBtn}" Content="&#xE838;" ToolTip="Open shortcuts folder" Click="OpenFolder_Click" />
                     <Button x:Name="SettingsBtn" Style="{StaticResource HeaderBtn}" Content="&#xE713;" ToolTip="Settings (Ctrl+,)" Click="Settings_Click" />
                     <Border Width="1" Height="18" Background="#22FFFFFF" Margin="8,0,4,0" />
                 </StackPanel>
-                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Top">
+                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Top">
                     <!-- Own caption buttons (drawn above wallpapers). Max button reports HTMAXBUTTON so Snap Layouts still work. -->
                     <StackPanel x:Name="CustomCaption" Orientation="Horizontal">
                         <Button Style="{StaticResource CaptionBtn}" Content="&#xE921;" Click="Min_Click" ToolTip="Minimize" />
@@ -447,7 +450,12 @@
             </Grid>
 
             <!-- Launchers -->
-            <ItemsControl x:Name="LaunchersBar" Grid.Row="1" Margin="20,8,20,0">
+            <!-- Drag to reorder in arrange mode (LaunchersBar_* handlers) -->
+            <ItemsControl x:Name="LaunchersBar" Grid.Row="1" Margin="20,8,20,0"
+                          PreviewMouseLeftButtonDown="LaunchersBar_PreviewMouseLeftButtonDown"
+                          PreviewMouseMove="LaunchersBar_PreviewMouseMove"
+                          PreviewMouseLeftButtonUp="LaunchersBar_PreviewMouseLeftButtonUp"
+                          LostMouseCapture="LaunchersBar_LostMouseCapture">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
                         <WrapPanel />
@@ -457,6 +465,10 @@
                     <DataTemplate>
                         <Button Style="{StaticResource PillBtn}" Click="Launcher_Click" ToolTip="{Binding FilePath}">
                             <StackPanel Orientation="Horizontal">
+                                <!-- Arrange-mode grip, like the filter tabs -->
+                                <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
+                                           Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,1,7,0"
+                                           Visibility="{DynamicResource TabGripVis}" />
                                 <Image Source="{Binding Icon}" Width="18" Height="18"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
                                 <TextBlock Text="{Binding Name}" FontSize="12" Margin="7,0,0,0" VerticalAlignment="Center"
@@ -514,7 +526,7 @@
                         <TextBlock Text="&#xE8CB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
                                    Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SecondaryBrush}"
-                                   Text="Drag tiles or filters  ·  Alt+arrows nudge" Margin="0,0,14,0" />
+                                   Text="Drag tiles, filters or launchers  ·  Alt+arrows nudge" Margin="0,0,14,0" />
                         <Button Style="{StaticResource SmallBtn}" Content="Reset to A–Z" Click="ArrangeReset_Click" Focusable="False" />
                         <Button Style="{StaticResource SmallBtn}" Content="Cancel" Margin="6,0,0,0" Click="ArrangeCancel_Click" Focusable="False" />
                         <Button Style="{StaticResource AccentSmallBtn}" Content="Done" Margin="6,0,0,0" Click="ArrangeDone_Click" />

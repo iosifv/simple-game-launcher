@@ -78,6 +78,8 @@ namespace GameLauncher
             };
             SizeChanged += (s, e) =>
             {
+                // The app name in the header gives way to the search box on narrow windows.
+                AppTitle.Visibility = ActualWidth >= 960 ? Visibility.Visible : Visibility.Collapsed;
                 if (IsLoaded && WindowState == WindowState.Normal)
                 {
                     Store.S.Width = ActualWidth;
@@ -335,13 +337,13 @@ namespace GameLauncher
             AssignTrainers();
 
             var oldLaunchers = Launchers.ToDictionary(l => l.FilePath, StringComparer.OrdinalIgnoreCase);
-            var newLaunchers = r.Launchers.OrderBy(l => l.SortKey, StringComparer.CurrentCultureIgnoreCase).Select(l =>
+            var newLaunchers = OrderLaunchers(r.Launchers.Select(l =>
             {
                 if (oldLaunchers.TryGetValue(l.FilePath, out var li) && li.LastWrite == l.LastWrite) return li;
                 var item = new LauncherItem { Name = l.Name, FilePath = l.FilePath, LastWrite = l.LastWrite };
                 _ = LoadLauncherIcon(item);
                 return item;
-            }).ToList();
+            }));
             if (!newLaunchers.SequenceEqual(Launchers))
             {
                 Launchers.Clear();
@@ -813,7 +815,7 @@ namespace GameLauncher
             if (_arranging) return; // no accidental launches while arranging
             if (!StartProcess(g.FilePath, out var error))
             {
-                MessageBox.Show(this, $"Couldn't start {g.Name}.\n\n{error}", "Game Launcher", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(this, $"Couldn't start {g.Name}.\n\n{error}", "Simple Game Launcher", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -878,6 +880,7 @@ namespace GameLauncher
 
         void Launcher_Click(object sender, RoutedEventArgs e)
         {
+            if (_arranging) return; // pills are being reordered, not started
             if ((sender as FrameworkElement)?.DataContext is LauncherItem l)
             {
                 if (StartProcess(l.FilePath, out var err)) Flash($"Opened {l.Name}");
@@ -1078,7 +1081,14 @@ namespace GameLauncher
                 if (cur >= 0 && cur != i) Tabs.Move(cur, i);
             }
             _suppressTab = false;
-            Flash("Games A–Z, filters in default order  ·  click Done to keep it");
+            // And launchers A–Z.
+            var alpha = Launchers.OrderBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+            for (int i = 0; i < alpha.Count; i++)
+            {
+                int cur = Launchers.IndexOf(alpha[i]);
+                if (cur != i) Launchers.Move(cur, i);
+            }
+            Flash("Games and launchers A–Z, filters in default order  ·  click Done to keep it");
         }
 
         void EnterArrange()
@@ -1100,7 +1110,8 @@ namespace GameLauncher
             TabsList.Tag = "arranging";
             Resources["TabGripVis"] = Visibility.Visible;
             SearchBox.IsEnabled = false;
-            Placeholder.Text = "Arrange mode — drag tiles or filters to reorder, then click Done";
+            Placeholder.Text = "Arrange mode — drag tiles, filters or launchers to reorder, then click Done";
+            LaunchersBar.Cursor = Cursors.SizeAll;
             SearchHint.Visibility = Visibility.Collapsed;
             RefreshView(keepSelection: true);
             GamesList.Focus();
@@ -1111,15 +1122,21 @@ namespace GameLauncher
             if (!_arranging) return;
             if (_dragging) EndDrag(true);
             EndTabDrag();
+            EndLauncherDrag();
             if (save)
             {
                 Store.S.CustomOrder = _alphaReset ? new List<string>() : Games.Select(g => g.Key).ToList();
                 _orderIndex = null;
                 var tabOrder = Tabs.Select(t => t.Value).ToList();
                 Store.S.TabOrder = tabOrder.SequenceEqual(DefaultTabs().Select(t => t.Value)) ? new List<string>() : tabOrder;
+                var launcherOrder = Launchers.Select(LauncherKey).ToList();
+                var alphabetical = Launchers.OrderBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase).Select(LauncherKey);
+                Store.S.LauncherOrder = launcherOrder.SequenceEqual(alphabetical) ? new List<string>() : launcherOrder;
                 SaveSoon();
             }
             _arranging = false;
+            LaunchersBar.Cursor = null;
+            ApplyLauncherOrder(); // on cancel this puts the launchers back in their saved order
             foreach (var g in Games) g.Arranging = false;
             _view.CustomSort = new GameSorter(this);
             RebuildTabs(); // on cancel this puts the filters back in their saved order
@@ -1559,6 +1576,84 @@ namespace GameLauncher
                 RefreshView(keepSelection: false);
                 ApplyWallpaper();
             }
+        }
+
+        // Launcher bar: drag the pills to reorder while arranging. Saved as Settings.LauncherOrder (file names).
+        LauncherItem _lnDragItem;
+        bool _lnDragging;
+        Point _lnDragStart;
+
+        static string LauncherKey(LauncherItem l) => Path.GetFileNameWithoutExtension(l.FilePath);
+
+        /// <summary>Saved order (or the current one while arranging), then alphabetical for launchers not in it.</summary>
+        List<LauncherItem> OrderLaunchers(IEnumerable<LauncherItem> items)
+        {
+            var order = _arranging ? Launchers.Select(LauncherKey).ToList() : Store.S.LauncherOrder;
+            var index = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < order.Count; i++) index.TryAdd(order[i], i);
+            return items.OrderBy(l => index.TryGetValue(LauncherKey(l), out var i) ? i : int.MaxValue)
+                        .ThenBy(l => l.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        }
+
+        void ApplyLauncherOrder()
+        {
+            var ordered = OrderLaunchers(Launchers.ToList());
+            if (ordered.SequenceEqual(Launchers)) return;
+            Launchers.Clear();
+            foreach (var l in ordered) Launchers.Add(l);
+        }
+
+        FrameworkElement LauncherContainerAt(Point p) =>
+            LaunchersBar.InputHitTest(p) is DependencyObject hit ? ItemsControl.ContainerFromElement(LaunchersBar, hit) as FrameworkElement : null;
+
+        void LaunchersBar_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_arranging) return;
+            if (LauncherContainerAt(e.GetPosition(LaunchersBar))?.DataContext is not LauncherItem l) return;
+            _lnDragItem = l;
+            _lnDragStart = e.GetPosition(LaunchersBar);
+            e.Handled = true; // keep the pill's button from pressing / launching
+        }
+
+        void LaunchersBar_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_arranging || _lnDragItem == null) return;
+            if (e.LeftButton != MouseButtonState.Pressed) { EndLauncherDrag(); return; }
+            var p = e.GetPosition(LaunchersBar);
+            if (!_lnDragging)
+            {
+                if ((p - _lnDragStart).Length < 5) return;
+                _lnDragging = true;
+                LaunchersBar.CaptureMouse();
+            }
+            var c = LauncherContainerAt(p);
+            if (c?.DataContext is not LauncherItem target || target == _lnDragItem) return;
+            int from = Launchers.IndexOf(_lnDragItem), to = Launchers.IndexOf(target);
+            if (from < 0 || to < 0) return;
+            // Swap only past the target's middle so pills of different widths don't flicker (same as the tabs).
+            double x = Mouse.GetPosition(c).X;
+            if (from < to && x < c.ActualWidth / 2) return;
+            if (from > to && x > c.ActualWidth / 2) return;
+            Launchers.Move(from, to);
+        }
+
+        void LaunchersBar_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_lnDragItem != null) e.Handled = true;
+            EndLauncherDrag();
+        }
+
+        void LaunchersBar_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            if (_lnDragging) EndLauncherDrag();
+        }
+
+        void EndLauncherDrag()
+        {
+            bool was = _lnDragging;
+            _lnDragging = false;
+            _lnDragItem = null;
+            if (was && LaunchersBar.IsMouseCaptured) LaunchersBar.ReleaseMouseCapture();
         }
 
         static T FindChild<T>(DependencyObject parent) where T : DependencyObject

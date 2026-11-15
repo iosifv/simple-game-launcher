@@ -31,7 +31,7 @@ namespace GameLauncher
             DispatcherUnhandledException += (s, a) =>
             {
                 try { File.AppendAllText(Path.Combine(AppContext.BaseDirectory, "error.log"), $"[{DateTime.Now}] {a.Exception}\r\n\r\n"); } catch { }
-                MessageBox.Show(a.Exception.Message, "Game Launcher", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(a.Exception.Message, "Simple Game Launcher", MessageBoxButton.OK, MessageBoxImage.Warning);
                 a.Handled = true;
             };
 
@@ -61,7 +61,7 @@ namespace GameLauncher
             _tray = new WinForms.NotifyIcon
             {
                 Icon = icon ?? System.Drawing.SystemIcons.Application,
-                Text = "Game Launcher",
+                Text = "Simple Game Launcher",
                 Visible = true
             };
 

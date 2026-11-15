@@ -11,7 +11,7 @@
     <AssemblyName>GameLauncher</AssemblyName>
     <RootNamespace>GameLauncher</RootNamespace>
     <Version>1.0.1</Version>
-    <Product>Game Launcher</Product>
+    <Product>Simple Game Launcher</Product>
   </PropertyGroup>
 
   <ItemGroup>
