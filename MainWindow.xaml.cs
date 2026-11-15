@@ -399,49 +399,52 @@ namespace GameLauncher
             bool portrait = Portrait;
             if (d?.NoCover == true) { SetCover(g, null, null); return; }
 
-            // Custom covers win; the one matching the card shape first (a hand-picked cover beats Steam's other art).
-            var custom = (portrait ? new[] { d?.CustomCoverPortrait, d?.CustomCover } : new[] { d?.CustomCover, d?.CustomCoverPortrait })
-                .FirstOrDefault(p => !string.IsNullOrEmpty(p) && File.Exists(p));
-            if (custom != null) { await ShowCover(g, ver, custom); return; }
+            // Order: custom image of the card's shape > Steam art of that shape > Steam landscape header (portrait cards only).
+            // The landscape and portrait custom images are independent: one shape never borrows the other's.
+            static string Existing(string p) => !string.IsNullOrEmpty(p) && File.Exists(p) ? p : null;
+            var sameCustom = Existing(portrait ? d?.CustomCoverPortrait : d?.CustomCover);
+            if (sameCustom != null) { await ShowCover(g, ver, sameCustom); return; }
 
             int? id = g.SteamAppId ?? d?.SteamAppId;
-            if (id != null)
-            {
-                var cached = portrait ? Covers.CachedPortraitPath(id.Value) : Covers.CachedPath(id.Value);
-                if (File.Exists(cached)) { await ShowCover(g, ver, cached); return; }
-            }
-            if (!Store.S.FetchCovers)
-            {
-                // Offline: a portrait card can still show the landscape header if we have it.
-                if (id != null && portrait && File.Exists(Covers.CachedPath(id.Value))) await ShowCover(g, ver, Covers.CachedPath(id.Value));
-                else SetCover(g, null, null);
-                return;
-            }
+            string steam = id == null ? null : Existing(portrait ? Covers.CachedPortraitPath(id.Value) : Covers.CachedPath(id.Value));
 
-            await NetGate.WaitAsync();
-            try
+            if (steam == null && Store.S.FetchCovers)
             {
-                if (id == null && d?.SteamLookupDone != true)
+                await NetGate.WaitAsync();
+                try
                 {
-                    var (ok, found) = await Covers.SearchSteam(g.Name);
-                    if (ok)
+                    if (id == null && d?.SteamLookupDone != true)
                     {
-                        var gd = Store.Game(g.Key);
-                        gd.SteamLookupDone = true;
-                        gd.SteamAppId = found;
-                        SaveSoon();
-                        id = found;
+                        var (ok, found) = await Covers.SearchSteam(g.Name);
+                        if (ok)
+                        {
+                            var gd = Store.Game(g.Key);
+                            gd.SteamLookupDone = true;
+                            gd.SteamAppId = found;
+                            SaveSoon();
+                            id = found;
+                        }
                     }
+                    if (id != null)
+                        steam = portrait ? await Covers.EnsureSteamPortrait(id.Value) : await Covers.EnsureSteamCover(id.Value);
                 }
-                if (id != null)
-                {
-                    var path = portrait
-                        ? await Covers.EnsureSteamPortrait(id.Value) ?? await Covers.EnsureSteamCover(id.Value)
-                        : await Covers.EnsureSteamCover(id.Value);
-                    if (path != null) await ShowCover(g, ver, path);
-                }
+                finally { NetGate.Release(); }
             }
-            finally { NetGate.Release(); }
+            if (ver != g.ArtVersion) return;
+            if (steam != null) { await ShowCover(g, ver, steam); return; }
+
+            if (portrait && id != null)
+            {
+                var header = Existing(Covers.CachedPath(id.Value));
+                if (header == null && Store.S.FetchCovers)
+                {
+                    await NetGate.WaitAsync();
+                    try { header = await Covers.EnsureSteamCover(id.Value); }
+                    finally { NetGate.Release(); }
+                }
+                if (header != null) { await ShowCover(g, ver, header); return; }
+            }
+            if (ver == g.ArtVersion) SetCover(g, null, null);
         }
 
         async Task ShowCover(GameItem g, int ver, string path)
@@ -753,6 +756,7 @@ namespace GameLauncher
         /// <summary>Names under the cards on/off: swaps the template resources.</summary>
         void ApplyCardLook()
         {
+            UpdateShapeBtn();
             bool text = Store.S.ShowCardText;
             Resources["CardTextVis"] = text ? Visibility.Visible : Visibility.Collapsed;
             Resources["NameOverlayVis"] = text ? Visibility.Collapsed : Visibility.Visible;
@@ -885,27 +889,28 @@ namespace GameLauncher
                 case "autotrainer": Store.Game(g.Key).Trainer = null; AfterTrainerChange(); break;
                 case "notrainer": Store.Game(g.Key).Trainer = ""; AfterTrainerChange(); break;
 
-                case "setcover":
+                case "setcover:landscape":
+                case "setcover:portrait":
                 {
+                    // Landscape and portrait each keep their own image.
+                    bool tall = (string)mi.Tag == "setcover:portrait";
                     var dlg = new Microsoft.Win32.OpenFileDialog
                     {
-                        Title = $"Choose a cover for {g.Name}",
+                        Title = $"Choose a {(tall ? "portrait (tall, e.g. 600×900)" : "landscape (wide, e.g. 460×215)")} cover for {g.Name}",
                         Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.webp|All files|*.*"
                     };
                     if (ShowDlg(dlg))
                     {
                         var d = Store.Game(g.Key);
-                        // A tall image becomes the portrait cover, a wide one the landscape cover.
-                        var probe = Covers.LoadImage(dlg.FileName, 64);
-                        bool tall = probe != null && probe.Height > probe.Width;
                         TryDelete(tall ? d.CustomCoverPortrait : d.CustomCover);
-                        var dest = Path.Combine(Store.CoverDir, $"custom_{Library.Normalize(g.Key)}{(tall ? "_portrait" : "")}_{DateTime.Now.Ticks}{Path.GetExtension(dlg.FileName)}");
+                        var dest = Path.Combine(Store.CoverDir, $"custom_{Library.Normalize(g.Key)}{(tall ? "_portrait" : "")}_{DateTime.Now.Ticks}{(Path.HasExtension(dlg.FileName) ? Path.GetExtension(dlg.FileName) : ".jpg")}");
                         try
                         {
                             File.Copy(dlg.FileName, dest, true);
                             if (tall) d.CustomCoverPortrait = dest; else d.CustomCover = dest;
                             d.NoCover = false;
-                            Flash(tall ? "Portrait cover set" : "Landscape cover set");
+                            Flash((tall ? "Portrait" : "Landscape") + $" image set for {g.Name}"
+                                  + (tall != Portrait ? $"  ·  shows when cards are {(tall ? "portrait" : "landscape")} (Settings → Cards)" : ""));
                         }
                         catch (Exception ex) { Flash("Couldn't copy image: " + ex.Message); }
                         SaveSoon();
@@ -913,13 +918,12 @@ namespace GameLauncher
                     }
                     break;
                 }
-                case "steamcover":
+                case "steamcover:landscape":
+                case "steamcover:portrait":
                 {
                     var d = Store.Game(g.Key);
-                    TryDelete(d.CustomCover);
-                    TryDelete(d.CustomCoverPortrait);
-                    d.CustomCover = null;
-                    d.CustomCoverPortrait = null;
+                    if ((string)mi.Tag == "steamcover:portrait") { TryDelete(d.CustomCoverPortrait); d.CustomCoverPortrait = null; }
+                    else { TryDelete(d.CustomCover); d.CustomCover = null; }
                     d.NoCover = false;
                     if (g.SteamAppId == null && d.SteamAppId == null) d.SteamLookupDone = false;
                     SaveSoon();
@@ -1113,7 +1117,19 @@ namespace GameLauncher
 
         void Tile_ContextMenuOpening(object sender, ContextMenuEventArgs e)
         {
-            if (_arranging) e.Handled = true;
+            if (_arranging) { e.Handled = true; return; }
+            // Cover actions apply to the card shape in use; say which.
+            if ((sender as FrameworkElement)?.ContextMenu is not ContextMenu cm) return;
+            var d = (sender as FrameworkElement).DataContext is GameItem g ? Store.Find(g.Key) : null;
+            foreach (var mi in cm.Items.OfType<MenuItem>().SelectMany(m => m.Items.OfType<MenuItem>()))
+            {
+                if (mi.Tag is not string tag || !tag.Contains(':')) continue;
+                bool portraitItem = tag.EndsWith(":portrait");
+                // The shape the cards use right now is in bold.
+                mi.FontWeight = portraitItem == Portrait ? FontWeights.SemiBold : FontWeights.Normal;
+                if (tag.StartsWith("steamcover"))
+                    mi.IsEnabled = !string.IsNullOrEmpty(portraitItem ? d?.CustomCoverPortrait : d?.CustomCover) || d?.NoCover == true;
+            }
         }
 
         ListBoxItem ContainerAt(Point p)
@@ -1383,13 +1399,37 @@ namespace GameLauncher
         void CardShape_Click(object sender, RoutedEventArgs e)
         {
             if (_loadingSettings) return;
-            var layout = PortraitRadio.IsChecked == true ? "portrait" : "landscape";
+            SetCardLayout(PortraitRadio.IsChecked == true ? "portrait" : "landscape");
+        }
+
+        // Filter-row button: flips between landscape and portrait cards.
+        void ShapeBtn_Click(object sender, RoutedEventArgs e) =>
+            SetCardLayout(Portrait ? "landscape" : "portrait");
+
+        void SetCardLayout(string layout)
+        {
             if (layout == Store.S.CardLayout) return;
             Store.S.CardLayout = layout;
             SaveSoon();
             ApplyTileSize();
             ReloadAllArt();
+            UpdateShapeBtn();
+            bool was = _loadingSettings;
+            _loadingSettings = true; // keep the settings radios in sync without re-entering
+            LandscapeRadio.IsChecked = !Portrait;
+            PortraitRadio.IsChecked = Portrait;
+            _loadingSettings = was;
             Flash(layout == "portrait" ? "Portrait cards" : "Landscape cards");
+        }
+
+        // The button shows the current shape: a small outline in that shape plus its name.
+        void UpdateShapeBtn()
+        {
+            bool p = Portrait;
+            ShapeGlyph.Width = p ? 9 : 14;
+            ShapeGlyph.Height = p ? 13 : 9;
+            ShapeText.Text = p ? "Portrait" : "Landscape";
+            ShapeBtn.ToolTip = p ? "Portrait cards · click for landscape" : "Landscape cards · click for portrait";
         }
 
         void CardText_Click(object sender, RoutedEventArgs e)

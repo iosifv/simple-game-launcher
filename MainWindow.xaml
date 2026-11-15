@@ -185,8 +185,13 @@
                 <MenuItem Header="No trainer" Tag="notrainer" Click="Menu_Click" />
             </MenuItem>
             <MenuItem Header="Cover">
-                <MenuItem Header="Choose image…" Tag="setcover" Click="Menu_Click" />
-                <MenuItem Header="Use Steam cover" Tag="steamcover" Click="Menu_Click" />
+                <!-- Each shape has its own image. Enabled state / current-shape bold set in Tile_ContextMenuOpening -->
+                <MenuItem Header="Choose landscape image…" Tag="setcover:landscape" Click="Menu_Click" />
+                <MenuItem Header="Choose portrait image…" Tag="setcover:portrait" Click="Menu_Click" />
+                <Separator />
+                <MenuItem Header="Use Steam landscape cover" Tag="steamcover:landscape" Click="Menu_Click" />
+                <MenuItem Header="Use Steam portrait cover" Tag="steamcover:portrait" Click="Menu_Click" />
+                <Separator />
                 <MenuItem Header="Icon only" Tag="nocover" Click="Menu_Click" />
             </MenuItem>
             <MenuItem Header="Edit tags…" Tag="tags" Click="Menu_Click" />
@@ -470,6 +475,16 @@
                 <StackPanel x:Name="TabsRight" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
                     <TextBlock x:Name="CountText" VerticalAlignment="Center" FontSize="12" Margin="0,0,10,0"
                                Foreground="{StaticResource MutedBrush}" />
+                    <Button x:Name="ShapeBtn" Style="{StaticResource ChipBtn}" Click="ShapeBtn_Click" Margin="0,0,4,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Grid Width="14" Height="13" VerticalAlignment="Center" Margin="0,0,7,0">
+                                <Border x:Name="ShapeGlyph" Width="14" Height="9" BorderThickness="1.4" CornerRadius="2"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        BorderBrush="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                            </Grid>
+                            <TextBlock x:Name="ShapeText" Text="Landscape" FontSize="12.5" />
+                        </StackPanel>
+                    </Button>
                     <Button x:Name="ArrangeBtn" Style="{StaticResource ChipBtn}" Click="ArrangeBtn_Click"
                             ToolTip="Arrange games and filters (custom order)">
                         <StackPanel Orientation="Horizontal">
