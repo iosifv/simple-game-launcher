@@ -1464,7 +1464,10 @@ namespace GameLauncher
             _dialogOpen = true;
             bool ok;
             try { ok = dlg.ShowDialog(this) == true; } finally { _dialogOpen = false; }
-            if (!ok || string.Equals(Path.GetFullPath(dlg.FolderName).TrimEnd('\\'), Path.GetFullPath(current ?? "").TrimEnd('\\'), OIC)) return;
+            if (!ok || string.IsNullOrWhiteSpace(dlg.FolderName)) return;
+            // On first run there is no folder yet (empty string), and Path.GetFullPath("") throws.
+            if (!string.IsNullOrWhiteSpace(current)
+                && string.Equals(Path.GetFullPath(dlg.FolderName).TrimEnd('\\'), Path.GetFullPath(current).TrimEnd('\\'), OIC)) return;
             ChangeFolder(dlg.FolderName);
         }
 
