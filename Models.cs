@@ -47,6 +47,9 @@ namespace GameLauncher
         }
         public string Folder { get => _folder; set { if (Set(ref _folder, value)) Raise(nameof(SubText)); } }
         public ImageSource Icon { get => _icon; set => Set(ref _icon, value); }
+        Brush _iconBackdrop;
+        /// <summary>Radial glow in the icon's colour, shown behind the icon on cards without a cover.</summary>
+        public Brush IconBackdrop { get => _iconBackdrop; set => Set(ref _iconBackdrop, value); }
         public ImageSource Cover { get => _cover; set { if (Set(ref _cover, value)) Raise(nameof(HasCover)); } }
         public bool HasCover => _cover != null;
 
@@ -125,6 +128,8 @@ namespace GameLauncher
         public int PlayCount { get; set; }
         public int? SteamAppId { get; set; }
         public bool SteamLookupDone { get; set; }
+        /// <summary>Microsoft Store / GOG were searched for a game Steam doesn't have (results cached as covers\store_*.jpg).</summary>
+        public bool StoreLookupDone { get; set; }
         public string CustomCover { get; set; }
         /// <summary>Custom cover used on portrait cards (a tall image).</summary>
         public string CustomCoverPortrait { get; set; }

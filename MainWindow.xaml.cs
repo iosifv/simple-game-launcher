@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -13,6 +13,8 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Shell;
 using System.Windows.Threading;
 
@@ -394,6 +396,7 @@ namespace GameLauncher
             var icon = await Icons.GetAsync(g.FilePath, 128);
             if (ver != g.ArtVersion) return;
             g.Icon = icon;
+            g.IconBackdrop = Covers.IconBackdrop(icon);
 
             var d = Store.Find(g.Key);
             bool portrait = Portrait;
@@ -432,6 +435,29 @@ namespace GameLauncher
             }
             if (ver != g.ArtVersion) return;
             if (steam != null) { await ShowCover(g, ver, steam); return; }
+
+            // Not on Steam: Microsoft Store / GOG art for an exact name match, cached per game.
+            if (id == null && Store.Find(g.Key)?.SteamLookupDone == true)
+            {
+                string Other() => Existing(Covers.StoreCachedPath(g.Key, portrait)) ?? Existing(Covers.StoreCachedPath(g.Key, !portrait));
+                var other = Other();
+                if (other == null && Store.S.FetchCovers && Store.Find(g.Key)?.StoreLookupDone != true)
+                {
+                    await NetGate.WaitAsync();
+                    try
+                    {
+                        if (await Covers.EnsureOtherStoreArt(g.Key, g.Name))
+                        {
+                            Store.Game(g.Key).StoreLookupDone = true;
+                            SaveSoon();
+                        }
+                    }
+                    finally { NetGate.Release(); }
+                    if (ver != g.ArtVersion) return;
+                    other = Other();
+                }
+                if (other != null) { await ShowCover(g, ver, other); return; }
+            }
 
             if (portrait && id != null)
             {
@@ -744,8 +770,8 @@ namespace GameLauncher
         {
             // Portrait cards are narrower at the same "card size" so a similar number of games fits on screen.
             double minTile = Store.S.TileMinWidth * (Portrait ? 0.72 : 1);
-            const double margin = 12, scrollbar = 18;
-            double avail = GamesList.ActualWidth - scrollbar;
+            const double margin = 12, scrollbar = 18, PanelPadX = 12 + 10; // WrapPanel margin in MainWindow.xaml
+            double avail = GamesList.ActualWidth - scrollbar - PanelPadX;
             if (avail <= 0) return;
             int cols = Math.Max(1, (int)(avail / (minTile + margin)));
             double tile = Math.Floor(avail / cols - margin);
@@ -901,21 +927,28 @@ namespace GameLauncher
                     };
                     if (ShowDlg(dlg))
                     {
-                        var d = Store.Game(g.Key);
-                        TryDelete(tall ? d.CustomCoverPortrait : d.CustomCover);
-                        var dest = Path.Combine(Store.CoverDir, $"custom_{Library.Normalize(g.Key)}{(tall ? "_portrait" : "")}_{DateTime.Now.Ticks}{(Path.HasExtension(dlg.FileName) ? Path.GetExtension(dlg.FileName) : ".jpg")}");
-                        try
-                        {
-                            File.Copy(dlg.FileName, dest, true);
-                            if (tall) d.CustomCoverPortrait = dest; else d.CustomCover = dest;
-                            d.NoCover = false;
+                        var ext = Path.HasExtension(dlg.FileName) ? Path.GetExtension(dlg.FileName) : ".jpg";
+                        if (SetCustomCover(g, tall, ext, dest => File.Copy(dlg.FileName, dest, true)))
                             Flash((tall ? "Portrait" : "Landscape") + $" image set for {g.Name}"
                                   + (tall != Portrait ? $"  ·  shows when cards are {(tall ? "portrait" : "landscape")} (Settings → Cards)" : ""));
-                        }
-                        catch (Exception ex) { Flash("Couldn't copy image: " + ex.Message); }
                         SaveSoon();
                         _ = LoadArt(g);
                     }
+                    break;
+                }
+                case "findcover":
+                {
+                    var pick = CoverPicker.Show(this, g.Name);
+                    if (pick == null) break;
+                    var set = new List<string>();
+                    if (pick.Landscape != null && SetCustomCover(g, false, ".jpg", dest => File.WriteAllBytes(dest, pick.Landscape))) set.Add("landscape");
+                    if (pick.Portrait != null && SetCustomCover(g, true, ".jpg", dest => File.WriteAllBytes(dest, pick.Portrait))) set.Add("portrait");
+                    if (set.Count == 2) Flash($"Landscape and portrait covers set for {g.Name}");
+                    else if (set.Count == 1)
+                        Flash((set[0] == "portrait" ? "Portrait" : "Landscape") + $" cover set for {g.Name}"
+                              + ((set[0] == "portrait") != Portrait ? $"  ·  shows when cards are {set[0]} (Settings → Cards)" : ""));
+                    SaveSoon();
+                    _ = LoadArt(g);
                     break;
                 }
                 case "steamcover:landscape":
@@ -925,7 +958,12 @@ namespace GameLauncher
                     if ((string)mi.Tag == "steamcover:portrait") { TryDelete(d.CustomCoverPortrait); d.CustomCoverPortrait = null; }
                     else { TryDelete(d.CustomCover); d.CustomCover = null; }
                     d.NoCover = false;
-                    if (g.SteamAppId == null && d.SteamAppId == null) d.SteamLookupDone = false;
+                    if (g.SteamAppId == null && d.SteamAppId == null)
+                    {
+                        // Look again, on Steam and the other stores.
+                        d.SteamLookupDone = false;
+                        d.StoreLookupDone = false;
+                    }
                     SaveSoon();
                     _ = LoadArt(g);
                     break;
@@ -974,6 +1012,19 @@ namespace GameLauncher
             AssignTrainers();
             RebuildTabs();
             RefreshView(keepSelection: true);
+        }
+
+        /// <summary>Replaces the game's custom landscape or portrait cover with a new file written by <paramref name="write"/>.</summary>
+        bool SetCustomCover(GameItem g, bool tall, string ext, Action<string> write)
+        {
+            var d = Store.Game(g.Key);
+            var dest = Path.Combine(Store.CoverDir, $"custom_{Library.Normalize(g.Key)}{(tall ? "_portrait" : "")}_{DateTime.Now.Ticks}{ext}");
+            try { write(dest); }
+            catch (Exception ex) { Flash("Couldn't save image: " + ex.Message); return false; }
+            TryDelete(tall ? d.CustomCoverPortrait : d.CustomCover);
+            if (tall) d.CustomCoverPortrait = dest; else d.CustomCover = dest;
+            d.NoCover = false;
+            return true;
         }
 
         static void TryDelete(string path)
@@ -1130,6 +1181,169 @@ namespace GameLauncher
                 if (tag.StartsWith("steamcover"))
                     mi.IsEnabled = !string.IsNullOrEmpty(portraitItem ? d?.CustomCoverPortrait : d?.CustomCover) || d?.NoCover == true;
             }
+        }
+
+        // ---------- tile hover effect ----------
+        // In: the card lifts and grows with a little spring, the art slowly zooms, a light sweeps across it
+        // and an accent glow fades in. Out: the card dips below its size and settles while the glow expands
+        // and dissolves. The glow (a DropShadowEffect) exists only while a card is hovered or fading out,
+        // so a big library scrolls as fast as before.
+
+        const double HoverScale = 1.06, HoverLift = -5, ArtZoom = 1.08, GlowBlur = 26, GlowOpacity = 0.7;
+
+        void Tile_MouseEnter(object sender, MouseEventArgs e)
+        {
+            if (sender is not ListBoxItem item || _arranging || (item.DataContext as GameItem)?.IsDragging == true) return;
+            if (item.Template.FindName("Card", item) is not Border card) return;
+            Panel.SetZIndex(item, 1); // grow over the neighbours, glow included
+
+            var (scale, lift) = CardTransforms(card);
+            var spring = new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.45 };
+            var smooth = new CubicEase { EasingMode = EasingMode.EaseOut };
+            Animate(scale, ScaleTransform.ScaleXProperty, HoverScale, 340, spring);
+            Animate(scale, ScaleTransform.ScaleYProperty, HoverScale, 340, spring);
+            Animate(lift, TranslateTransform.YProperty, HoverLift, 340, spring);
+
+            if (card.Effect is not DropShadowEffect glow || glow.IsFrozen)
+            {
+                card.Effect = glow = new DropShadowEffect
+                {
+                    ShadowDepth = 0,
+                    BlurRadius = 0,
+                    Opacity = 0,
+                    RenderingBias = RenderingBias.Performance
+                };
+            }
+            // Ambient glow: the cover's own colour (set every time, the cover may have changed).
+            glow.Color = GlowColor(item.DataContext as GameItem);
+            Animate(glow, DropShadowEffect.BlurRadiusProperty, GlowBlur, 320, smooth);
+            Animate(glow, DropShadowEffect.OpacityProperty, GlowOpacity, 320, smooth);
+
+            foreach (var zoom in ArtZooms(item))
+            {
+                Animate(zoom, ScaleTransform.ScaleXProperty, ArtZoom, 900, smooth);
+                Animate(zoom, ScaleTransform.ScaleYProperty, ArtZoom, 900, smooth);
+            }
+            Sweep(item);
+        }
+
+        void Tile_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (sender is not ListBoxItem item || item.Template.FindName("Card", item) is not Border card) return;
+            var (scale, lift) = CardTransforms(card);
+
+            // Dip just under normal size, then settle: a soft "drop back into the grid".
+            var settle = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(420) };
+            settle.KeyFrames.Add(new EasingDoubleKeyFrame(0.975, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(180)), new CubicEase { EasingMode = EasingMode.EaseIn }));
+            settle.KeyFrames.Add(new EasingDoubleKeyFrame(1.0, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(420)), new CubicEase { EasingMode = EasingMode.EaseOut }));
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, settle);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, settle.Clone());
+            Animate(lift, TranslateTransform.YProperty, 0, 380, new CubicEase { EasingMode = EasingMode.EaseInOut });
+
+            foreach (var zoom in ArtZooms(item))
+            {
+                Animate(zoom, ScaleTransform.ScaleXProperty, 1, 450, new CubicEase { EasingMode = EasingMode.EaseOut });
+                Animate(zoom, ScaleTransform.ScaleYProperty, 1, 450, new CubicEase { EasingMode = EasingMode.EaseOut });
+            }
+
+            if (item.Template.FindName("Shine", item) is Border shine)
+                Animate(shine, OpacityProperty, 0, 200, null);
+
+            if (card.Effect is DropShadowEffect glow && !glow.IsFrozen)
+            {
+                // The glow spreads out while it fades, then the effect is removed.
+                Animate(glow, DropShadowEffect.BlurRadiusProperty, GlowBlur * 1.8, 420, new CubicEase { EasingMode = EasingMode.EaseOut });
+                var fade = new DoubleAnimation(0, TimeSpan.FromMilliseconds(420)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+                fade.Completed += (s, a) =>
+                {
+                    if (item.IsMouseOver || card.Effect != glow) return; // hovered again meanwhile
+                    card.Effect = null;
+                    Panel.SetZIndex(item, 0);
+                };
+                glow.BeginAnimation(DropShadowEffect.OpacityProperty, fade);
+            }
+            else Panel.SetZIndex(item, 0);
+        }
+
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource, object> GlowColors = new();
+
+        /// <summary>Glow colour for a card: the cover's most vivid colour (from its tiny blurred copy), else the icon's,
+        /// else the accent. Cached per image, so a new cover gets a new colour.</summary>
+        static Color GlowColor(GameItem g)
+        {
+            var accent = ((SolidColorBrush)Application.Current.Resources["AccentBrush"]).Color;
+            var src = (g?.CoverFill ?? g?.Cover ?? g?.Icon) as System.Windows.Media.Imaging.BitmapSource;
+            if (src == null) return accent;
+            if (GlowColors.TryGetValue(src, out var cached)) return (Color)cached;
+            var c = Covers.VividColor(src) ?? accent;
+            GlowColors.AddOrUpdate(src, c);
+            return c;
+        }
+
+        static void Animate(IAnimatable target, DependencyProperty dp, double to, int ms, IEasingFunction ease) =>
+            target.BeginAnimation(dp, new DoubleAnimation(to, TimeSpan.FromMilliseconds(ms)) { EasingFunction = ease });
+
+        /// <summary>The card's scale + lift transforms, created on first use (template-made ones may be frozen).</summary>
+        static (ScaleTransform scale, TranslateTransform lift) CardTransforms(Border card)
+        {
+            if (card.RenderTransform is TransformGroup g && !g.IsFrozen && g.Children.Count == 2
+                && g.Children[0] is ScaleTransform s && g.Children[1] is TranslateTransform t)
+                return (s, t);
+            s = new ScaleTransform(1, 1);
+            t = new TranslateTransform();
+            card.RenderTransformOrigin = new Point(0.5, 0.5);
+            card.RenderTransform = new TransformGroup { Children = { s, t } };
+            return (s, t);
+        }
+
+        /// <summary>Zoom transforms for whichever cover parts are showing: the image brushes zoom inside their
+        /// rounded corners, the letterboxed image scales (clipped by the art area).</summary>
+        static IEnumerable<ScaleTransform> ArtZooms(ListBoxItem item)
+        {
+            foreach (var name in new[] { "CoverFull", "CoverBackdrop" })
+                if (item.Template.FindName(name, item) is Border b && b.Background is ImageBrush brush && !brush.IsFrozen)
+                {
+                    if (brush.RelativeTransform is not ScaleTransform z || z.IsFrozen)
+                        brush.RelativeTransform = z = new ScaleTransform(1, 1, 0.5, 0.5);
+                    yield return z;
+                }
+            if (item.Template.FindName("CoverFitted", item) is Image img)
+            {
+                if (img.RenderTransform is not ScaleTransform z || z.IsFrozen)
+                {
+                    img.RenderTransformOrigin = new Point(0.5, 0.5);
+                    img.RenderTransform = z = new ScaleTransform(1, 1);
+                }
+                yield return z;
+            }
+        }
+
+        /// <summary>A soft diagonal band of light that crosses the art once.</summary>
+        static void Sweep(ListBoxItem item)
+        {
+            if (item.Template.FindName("Shine", item) is not Border shine) return;
+            if (shine.Background is not LinearGradientBrush band || band.IsFrozen)
+            {
+                band = new LinearGradientBrush
+                {
+                    StartPoint = new Point(0, 0),
+                    EndPoint = new Point(1, 1),
+                    GradientStops =
+                    {
+                        new GradientStop(Color.FromArgb(0, 255, 255, 255), 0.35),
+                        new GradientStop(Color.FromArgb(0x38, 255, 255, 255), 0.5),
+                        new GradientStop(Color.FromArgb(0, 255, 255, 255), 0.65)
+                    },
+                    RelativeTransform = new TranslateTransform()
+                };
+                shine.Background = band;
+            }
+            var move = (TranslateTransform)band.RelativeTransform;
+            var sweep = new DoubleAnimation(-1, 1, TimeSpan.FromMilliseconds(750)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+            move.BeginAnimation(TranslateTransform.XProperty, sweep);
+            move.BeginAnimation(TranslateTransform.YProperty, sweep.Clone());
+            shine.BeginAnimation(OpacityProperty, null);
+            shine.Opacity = 1;
         }
 
         ListBoxItem ContainerAt(Point p)
