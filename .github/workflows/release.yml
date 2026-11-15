@@ -1,0 +1,60 @@
+name: Release
+
+# Push a tag like v1.0.0 to build GameLauncher.exe and publish it as a GitHub release.
+#   git tag v1.0.0
+#   git push origin v1.0.0
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to (re)build, e.g. v1.0.0'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish self-contained single-file exe
+        shell: pwsh
+        run: |
+          $version = $env:TAG.TrimStart('v')
+          dotnet publish -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:DebugType=none `
+            -p:Version=$version `
+            -o out
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Simple Game Launcher ${{ env.TAG }}
+          files: out/GameLauncher.exe
+          generate_release_notes: true
+          body: |
+            ## Download
+
+            1. Download **GameLauncher.exe** below (under *Assets*).
+            2. Put it in a folder of its own, e.g. `Documents\Game Launcher` (it keeps its settings and cover art next to itself, so avoid `Program Files`).
+            3. Double-click it. On first start it asks for your games folder — the folder with your game shortcuts.
+
+            No installer and nothing else to install: everything it needs is inside the exe. Windows 10 or 11, 64-bit.
+
+            **"Windows protected your PC"?** The exe isn't code-signed, so SmartScreen may warn on first run. Click **More info → Run anyway**.

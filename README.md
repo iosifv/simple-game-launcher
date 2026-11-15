@@ -24,10 +24,23 @@ My Games Folder\
                              (Tools is excluded from the Games filter)
 ```
 
+## Download
+
+Get **GameLauncher.exe** from the [latest release](https://github.com/iosifv/simple-game-launcher/releases/latest). It's a single file with everything included, so there's no installer and nothing else to install. Put it in a folder of its own (it keeps its data next to itself) and double-click it. Windows may show a SmartScreen warning because the exe isn't signed: click **More info → Run anyway**.
+
 ## Requirements
 
-- Windows 11 (Windows 10 works without the Mica background)
-- [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) to run, .NET 10 SDK to build
+- Windows 11 (Windows 10 works without the Mica background), 64-bit
+- To build from source: .NET 10 SDK (the release exe needs nothing extra; a build with `--self-contained false` needs the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0))
+
+## Releasing
+
+Push a version tag and GitHub Actions builds the self-contained exe and publishes the release:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ## Build and run
 
