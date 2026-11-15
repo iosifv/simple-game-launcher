@@ -16,6 +16,13 @@
         <BooleanToVisibilityConverter x:Key="BoolVis" />
         <sys:Double x:Key="TileWidth">230</sys:Double>
         <sys:Double x:Key="ArtHeight">107</sys:Double>
+        <!-- Swapped from code by ApplyCardLook() -->
+        <Visibility x:Key="CardTextVis">Visible</Visibility>
+        <Visibility x:Key="NameOverlayVis">Collapsed</Visibility>
+        <Visibility x:Key="TabGripVis">Collapsed</Visibility>
+        <sys:Boolean x:Key="CardTipOn">False</sys:Boolean>
+        <CornerRadius x:Key="ArtCorner">6,6,0,0</CornerRadius>
+        <Thickness x:Key="IconMargin">0</Thickness>
 
         <Style x:Key="CaptionBtn" TargetType="Button">
             <Setter Property="Width" Value="46" />
@@ -78,6 +85,32 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="B" Background="Transparent" CornerRadius="6">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="B" Property="Background" Value="#1AFFFFFF" />
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="B" Property="Background" Value="#0FFFFFFF" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Tab-shaped button (Arrange, beside the filter tabs) -->
+        <Style x:Key="ChipBtn" TargetType="Button">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="{StaticResource SecondaryBrush}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="B" CornerRadius="14" Padding="12,5,13,5" Background="Transparent"
+                                BorderBrush="#1FFFFFFF" BorderThickness="1">
+                            <ContentPresenter />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -180,17 +213,30 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
                         <Border x:Name="Card" Width="{DynamicResource TileWidth}" CornerRadius="8" Background="#B31E1E24"
-                                BorderBrush="#16FFFFFF" BorderThickness="2" SnapsToDevicePixels="True" Cursor="Hand">
+                                BorderBrush="#16FFFFFF" BorderThickness="2" SnapsToDevicePixels="True" Cursor="Hand"
+                                ToolTip="{Binding Name}" ToolTipService.IsEnabled="{DynamicResource CardTipOn}">
                             <StackPanel>
                                 <Grid Height="{DynamicResource ArtHeight}">
-                                    <Border CornerRadius="6,6,0,0" Background="#0AFFFFFF" />
-                                    <Image Source="{Binding Icon}" Width="60" Height="60"
+                                    <Border CornerRadius="{DynamicResource ArtCorner}" Background="#0AFFFFFF" />
+                                    <Image x:Name="IconImg" Source="{Binding Icon}" Width="60" Height="60" Margin="{DynamicResource IconMargin}"
                                            RenderOptions.BitmapScalingMode="HighQuality" />
-                                    <Border CornerRadius="6,6,0,0">
+                                    <!-- Cover of the other shape: soft blurred backdrop + the whole image letterboxed -->
+                                    <Border x:Name="CoverBackdrop" CornerRadius="{DynamicResource ArtCorner}" Opacity="0.6" Visibility="Collapsed">
+                                        <Border.Background>
+                                            <ImageBrush ImageSource="{Binding CoverFill}" Stretch="UniformToFill" />
+                                        </Border.Background>
+                                    </Border>
+                                    <Image x:Name="CoverFitted" Source="{Binding Cover}" Stretch="Uniform" Visibility="Collapsed"
+                                           RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <Border x:Name="CoverFull" CornerRadius="{DynamicResource ArtCorner}">
                                         <Border.Background>
                                             <ImageBrush ImageSource="{Binding Cover}" Stretch="UniformToFill" />
                                         </Border.Background>
                                     </Border>
+                                    <!-- Name over icon-only cards when names under cards are hidden -->
+                                    <TextBlock x:Name="NameOverlay" Text="{Binding Name}" Visibility="{DynamicResource NameOverlayVis}"
+                                               VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="10,0,10,9"
+                                               FontSize="12.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                     <Button Style="{StaticResource TrainerBadge}" HorizontalAlignment="Right"
                                             VerticalAlignment="Top" Margin="6" Click="TrainerBadge_Click"
                                             ToolTip="{Binding TrainerTip}"
@@ -203,7 +249,7 @@
                                                    Foreground="{StaticResource AccentBrush}" />
                                     </Border>
                                 </Grid>
-                                <StackPanel Margin="10,7,10,9">
+                                <StackPanel Margin="10,7,10,9" Visibility="{DynamicResource CardTextVis}">
                                     <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
                                                TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
                                     <TextBlock Text="{Binding SubText}" FontSize="11" Margin="0,2,0,0"
@@ -212,6 +258,15 @@
                             </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding CoverFits}" Value="False">
+                                <Setter TargetName="CoverBackdrop" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="CoverFitted" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="CoverFull" Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding HasCover}" Value="True">
+                                <Setter TargetName="NameOverlay" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="IconImg" Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
                             <DataTrigger Binding="{Binding Arranging}" Value="True">
                                 <Setter TargetName="Card" Property="Cursor" Value="SizeAll" />
                                 <Setter TargetName="Card" Property="BorderBrush" Value="#5560CDFF" />
@@ -243,9 +298,16 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="B" CornerRadius="14" Padding="13,5" Background="Transparent">
-                            <TextBlock x:Name="T" Text="{Binding Label}" FontSize="12.5"
-                                       Foreground="{StaticResource SecondaryBrush}" />
+                        <Border x:Name="B" CornerRadius="14" Padding="13,5" Background="Transparent"
+                                BorderThickness="1" BorderBrush="Transparent">
+                            <StackPanel Orientation="Horizontal">
+                                <!-- Arrange-mode grip -->
+                                <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
+                                           Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,1,7,0"
+                                           Visibility="{DynamicResource TabGripVis}" />
+                                <TextBlock x:Name="T" Text="{Binding Label}" FontSize="12.5"
+                                           Foreground="{StaticResource SecondaryBrush}" />
+                            </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -256,6 +318,10 @@
                                 <Setter TargetName="T" Property="Foreground" Value="{StaticResource AccentBrush}" />
                                 <Setter TargetName="T" Property="FontWeight" Value="SemiBold" />
                             </Trigger>
+                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=ListBox}}" Value="arranging">
+                                <Setter Property="Cursor" Value="SizeAll" />
+                                <Setter TargetName="B" Property="BorderBrush" Value="#3360CDFF" />
+                            </DataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -346,7 +412,6 @@
                                VerticalAlignment="Center" Margin="0,0,14,0" IsHitTestVisible="False" />
                 </Grid>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button x:Name="ArrangeBtn" Style="{StaticResource HeaderBtn}" Content="&#xE8CB;" ToolTip="Arrange games (custom order)" Click="ArrangeBtn_Click" />
                     <Button Style="{StaticResource HeaderBtn}" Content="&#xE72C;" ToolTip="Rescan folder (F5)" Click="Refresh_Click" />
                     <Button Style="{StaticResource HeaderBtn}" Content="&#xE838;" ToolTip="Open shortcuts folder" Click="OpenFolder_Click" />
                     <Button x:Name="SettingsBtn" Style="{StaticResource HeaderBtn}" Content="&#xE713;" ToolTip="Settings (Ctrl+,)" Click="Settings_Click" />
@@ -385,24 +450,42 @@
 
             <!-- Filter tabs -->
             <Grid Grid.Row="2" Margin="16,4,22,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <ListBox x:Name="TabsList" ItemContainerStyle="{StaticResource TabStyle}" Background="Transparent"
                          BorderThickness="0" Padding="0" SelectionChanged="Tabs_SelectionChanged"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled" VerticalAlignment="Center"
+                         PreviewMouseLeftButtonDown="TabsList_PreviewMouseLeftButtonDown"
+                         PreviewMouseMove="TabsList_PreviewMouseMove"
+                         PreviewMouseLeftButtonUp="TabsList_PreviewMouseLeftButtonUp"
+                         LostMouseCapture="TabsList_LostMouseCapture">
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel />
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                 </ListBox>
-                <TextBlock x:Name="CountText" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12"
-                           Foreground="{StaticResource MutedBrush}" />
-                <Border x:Name="ArrangeBar" HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed"
+                <StackPanel x:Name="TabsRight" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <TextBlock x:Name="CountText" VerticalAlignment="Center" FontSize="12" Margin="0,0,10,0"
+                               Foreground="{StaticResource MutedBrush}" />
+                    <Button x:Name="ArrangeBtn" Style="{StaticResource ChipBtn}" Click="ArrangeBtn_Click"
+                            ToolTip="Arrange games and filters (custom order)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE8CB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                                       VerticalAlignment="Center" Margin="0,1,7,0" />
+                            <TextBlock Text="Arrange" FontSize="12.5" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+                <Border x:Name="ArrangeBar" Grid.Column="1" Margin="12,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed"
                         Background="#E6141A20" BorderBrush="#6660CDFF" BorderThickness="1" CornerRadius="8" Padding="12,5,6,5">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE8CB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
                                    Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SecondaryBrush}"
-                                   Text="Drag tiles to reorder  ·  Alt+arrows nudge" Margin="0,0,14,0" />
+                                   Text="Drag tiles or filters  ·  Alt+arrows nudge" Margin="0,0,14,0" />
                         <Button Style="{StaticResource SmallBtn}" Content="Reset to A–Z" Click="ArrangeReset_Click" Focusable="False" />
                         <Button Style="{StaticResource SmallBtn}" Content="Cancel" Margin="6,0,0,0" Click="ArrangeCancel_Click" Focusable="False" />
                         <Button Style="{StaticResource AccentSmallBtn}" Content="Done" Margin="6,0,0,0" Click="ArrangeDone_Click" />
@@ -466,7 +549,7 @@
                             <Border Style="{StaticResource SectionCard}">
                                 <StackPanel>
                                     <Grid>
-                                        <TextBlock Text="Card size" Style="{StaticResource SectionTitle}" />
+                                        <TextBlock Text="Cards" Style="{StaticResource SectionTitle}" />
                                         <TextBlock x:Name="CardSizeText" HorizontalAlignment="Right" FontSize="12"
                                                    Foreground="{StaticResource SecondaryBrush}" />
                                     </Grid>
@@ -490,6 +573,24 @@
                                         <Button Style="{StaticResource SmallBtn}" Content="Reset" HorizontalAlignment="Right"
                                                 VerticalAlignment="Center" Click="CardReset_Click" />
                                     </Grid>
+                                    <Grid Margin="0,14,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center" Margin="0,0,12,0">
+                                            <TextBlock Text="Shape" FontSize="13" />
+                                            <TextBlock Style="{StaticResource Hint}" Text="Portrait uses Steam's tall library art" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <RadioButton x:Name="LandscapeRadio" GroupName="CardShape" Content="Landscape" MinWidth="0"
+                                                         Margin="0,0,10,0" Checked="CardShape_Click" />
+                                            <RadioButton x:Name="PortraitRadio" GroupName="CardShape" Content="Portrait" MinWidth="0"
+                                                         Checked="CardShape_Click" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <CheckBox x:Name="CardTextBox" Content="Show names under the cards" Margin="0,10,0,0"
+                                              Checked="CardText_Click" Unchecked="CardText_Click" />
                                 </StackPanel>
                             </Border>
 

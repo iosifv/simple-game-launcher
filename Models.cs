@@ -47,7 +47,15 @@ namespace GameLauncher
         }
         public string Folder { get => _folder; set { if (Set(ref _folder, value)) Raise(nameof(SubText)); } }
         public ImageSource Icon { get => _icon; set => Set(ref _icon, value); }
-        public ImageSource Cover { get => _cover; set => Set(ref _cover, value); }
+        public ImageSource Cover { get => _cover; set { if (Set(ref _cover, value)) Raise(nameof(HasCover)); } }
+        public bool HasCover => _cover != null;
+
+        ImageSource _coverFill;
+        bool _coverFits = true;
+        /// <summary>Tiny, upscaled copy of the cover: a soft blurred backdrop when the cover's shape doesn't match the card.</summary>
+        public ImageSource CoverFill { get => _coverFill; set => Set(ref _coverFill, value); }
+        /// <summary>False when the cover is the other orientation (e.g. a landscape header on a portrait card): it's shown whole, letterboxed.</summary>
+        public bool CoverFits { get => _coverFits; set => Set(ref _coverFits, value); }
         public string Trainer
         {
             get => _trainer;
@@ -118,6 +126,8 @@ namespace GameLauncher
         public int? SteamAppId { get; set; }
         public bool SteamLookupDone { get; set; }
         public string CustomCover { get; set; }
+        /// <summary>Custom cover used on portrait cards (a tall image).</summary>
+        public string CustomCoverPortrait { get; set; }
         public bool NoCover { get; set; }
     }
 
@@ -141,6 +151,11 @@ namespace GameLauncher
         public Dictionary<string, string> Wallpapers { get; set; } = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         /// <summary>Custom game order (keys). Empty = alphabetical. Games not listed go to the end.</summary>
         public List<string> CustomOrder { get; set; } = new List<string>();
+        /// <summary>Custom filter-tab order (tab values). Empty = default order. Tabs not listed go to the end.</summary>
+        public List<string> TabOrder { get; set; } = new List<string>();
+        /// <summary>"landscape" (Steam header art) or "portrait" (Steam library art).</summary>
+        public string CardLayout { get; set; } = "landscape";
+        public bool ShowCardText { get; set; } = true;
         public double WallpaperDim { get; set; } = 0.5;
         public double WallpaperBlur { get; set; } = 0;
         public Dictionary<string, GameData> Games { get; set; } = new Dictionary<string, GameData>(StringComparer.OrdinalIgnoreCase);
@@ -177,6 +192,8 @@ namespace GameLauncher
             s.Wallpapers = new Dictionary<string, string>(s.Wallpapers ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
             s.NonGameFolders ??= new List<string> { "Tools" };
             s.CustomOrder ??= new List<string>();
+            s.TabOrder ??= new List<string>();
+            if (s.CardLayout != "portrait") s.CardLayout = "landscape";
             if (string.IsNullOrWhiteSpace(s.DefaultTab)) s.DefaultTab = "games";
             s.TileMinWidth = Math.Clamp(s.TileMinWidth <= 0 ? 220 : s.TileMinWidth, 150, 420);
             S = s;

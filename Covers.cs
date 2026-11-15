@@ -21,6 +21,27 @@ namespace GameLauncher
         }
 
         public static string CachedPath(int appId) => Path.Combine(Store.CoverDir, $"steam_{appId}.jpg");
+        public static string CachedPortraitPath(int appId) => Path.Combine(Store.CoverDir, $"steam_{appId}_portrait.jpg");
+
+        static readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> NoPortrait = new();
+
+        /// <summary>Steam "library capsule" (600×900). Not every app has one; misses are remembered for this session.</summary>
+        public static async Task<string> EnsureSteamPortrait(int appId)
+        {
+            var path = CachedPortraitPath(appId);
+            if (File.Exists(path)) return path;
+            if (NoPortrait.ContainsKey(appId)) return null;
+            string[] urls =
+            {
+                $"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appId}/library_600x900.jpg",
+                $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId}/library_600x900.jpg",
+                $"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appId}/library_600x900_2x.jpg"
+            };
+            foreach (var u in urls)
+                if (await TryDownload(u, path)) return path;
+            NoPortrait[appId] = true;
+            return null;
+        }
 
         public static async Task<string> EnsureSteamCover(int appId)
         {
@@ -81,7 +102,10 @@ namespace GameLauncher
             catch { return (false, null); }
         }
 
-        public static ImageSource LoadImage(string path)
+        public static ImageSource LoadImage(string path) => LoadImage(path, 460);
+
+        /// <summary>decodeWidth ~24 gives a tiny image that, stretched, works as a cheap blur.</summary>
+        public static ImageSource LoadImage(string path, int decodeWidth)
         {
             try
             {
@@ -90,7 +114,7 @@ namespace GameLauncher
                 b.CacheOption = BitmapCacheOption.OnLoad;
                 b.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
                 b.UriSource = new Uri(path);
-                b.DecodePixelWidth = 460;
+                b.DecodePixelWidth = decodeWidth;
                 b.EndInit();
                 b.Freeze();
                 return b;

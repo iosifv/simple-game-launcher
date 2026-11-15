@@ -49,6 +49,8 @@ namespace GameLauncher
             Height = Math.Max(MinHeight, Store.S.Height);
             Tab = Store.S.DefaultTab;
 
+            ApplyCardLook();
+
             _view = (ListCollectionView)CollectionViewSource.GetDefaultView(Games);
             _view.Filter = o => Matches((GameItem)o);
             _view.CustomSort = new GameSorter(this);
@@ -199,6 +201,9 @@ namespace GameLauncher
         public void ReloadSettings()
         {
             Store.Load();
+            ApplyCardLook();
+            ApplyTileSize();
+            _orderIndex = null;
             RegisterHotkey();
             StartWatching();
             foreach (var g in Games) g.LastWrite = DateTime.MinValue; // forces icon/cover reload
@@ -391,22 +396,27 @@ namespace GameLauncher
             g.Icon = icon;
 
             var d = Store.Find(g.Key);
-            if (d?.NoCover == true) { g.Cover = null; return; }
-            if (!string.IsNullOrEmpty(d?.CustomCover) && File.Exists(d.CustomCover))
-            {
-                var img = await Task.Run(() => Covers.LoadImage(d.CustomCover));
-                if (ver == g.ArtVersion) g.Cover = img;
-                return;
-            }
+            bool portrait = Portrait;
+            if (d?.NoCover == true) { SetCover(g, null, null); return; }
+
+            // Custom covers win; the one matching the card shape first (a hand-picked cover beats Steam's other art).
+            var custom = (portrait ? new[] { d?.CustomCoverPortrait, d?.CustomCover } : new[] { d?.CustomCover, d?.CustomCoverPortrait })
+                .FirstOrDefault(p => !string.IsNullOrEmpty(p) && File.Exists(p));
+            if (custom != null) { await ShowCover(g, ver, custom); return; }
 
             int? id = g.SteamAppId ?? d?.SteamAppId;
-            if (id != null && File.Exists(Covers.CachedPath(id.Value)))
+            if (id != null)
             {
-                var img = await Task.Run(() => Covers.LoadImage(Covers.CachedPath(id.Value)));
-                if (ver == g.ArtVersion) g.Cover = img;
+                var cached = portrait ? Covers.CachedPortraitPath(id.Value) : Covers.CachedPath(id.Value);
+                if (File.Exists(cached)) { await ShowCover(g, ver, cached); return; }
+            }
+            if (!Store.S.FetchCovers)
+            {
+                // Offline: a portrait card can still show the landscape header if we have it.
+                if (id != null && portrait && File.Exists(Covers.CachedPath(id.Value))) await ShowCover(g, ver, Covers.CachedPath(id.Value));
+                else SetCover(g, null, null);
                 return;
             }
-            if (!Store.S.FetchCovers) { g.Cover = null; return; }
 
             await NetGate.WaitAsync();
             try
@@ -425,15 +435,34 @@ namespace GameLauncher
                 }
                 if (id != null)
                 {
-                    var path = await Covers.EnsureSteamCover(id.Value);
-                    if (path != null)
-                    {
-                        var img = await Task.Run(() => Covers.LoadImage(path));
-                        if (ver == g.ArtVersion) g.Cover = img;
-                    }
+                    var path = portrait
+                        ? await Covers.EnsureSteamPortrait(id.Value) ?? await Covers.EnsureSteamCover(id.Value)
+                        : await Covers.EnsureSteamCover(id.Value);
+                    if (path != null) await ShowCover(g, ver, path);
                 }
             }
             finally { NetGate.Release(); }
+        }
+
+        async Task ShowCover(GameItem g, int ver, string path)
+        {
+            var (img, fill) = await Task.Run(() => (Covers.LoadImage(path), Covers.LoadImage(path, 24)));
+            if (ver == g.ArtVersion) SetCover(g, img, fill);
+        }
+
+        static void SetCover(GameItem g, ImageSource img, ImageSource fill)
+        {
+            g.Cover = img;
+            g.CoverFill = fill;
+            // Fits = roughly the card's aspect ratio; otherwise show it whole over a blurred backdrop.
+            if (img == null || img.Height <= 0) { g.CoverFits = true; return; }
+            double ratio = img.Width / img.Height, target = Portrait ? 2.0 / 3.0 : 460.0 / 215.0;
+            g.CoverFits = Math.Abs(ratio - target) / target < 0.25;
+        }
+
+        void ReloadAllArt()
+        {
+            foreach (var g in Games) _ = LoadArt(g);
         }
 
         async Task LoadLauncherIcon(LauncherItem l) => l.Icon = await Icons.GetAsync(l.FilePath, 32);
@@ -513,7 +542,7 @@ namespace GameLauncher
             UpdateStatus();
         }
 
-        void RebuildTabs()
+        List<TabVm> DefaultTabs()
         {
             var list = new List<TabVm> { new TabVm("Games", "games"), new TabVm("All", "all"), new TabVm("Recent", "recent") };
             if (Games.Any(g => g.HasTrainer)) list.Add(new TabVm("With trainer", "trainer"));
@@ -521,7 +550,26 @@ namespace GameLauncher
                 list.Add(new TabVm(f, "folder:" + f));
             foreach (var t in Games.SelectMany(g => g.Tags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t))
                 list.Add(new TabVm("#" + t, "tag:" + t));
+            return list;
+        }
 
+        /// <summary>Default tabs in the saved custom order (while arranging: the order on screen). New tabs go to the end.</summary>
+        List<TabVm> OrderedTabs()
+        {
+            var list = DefaultTabs();
+            var order = _arranging ? Tabs.Select(t => t.Value).ToList() : Store.S.TabOrder;
+            if (order.Count == 0) return list;
+            int Pos(TabVm t)
+            {
+                int i = order.FindIndex(v => string.Equals(v, t.Value, OIC));
+                return i >= 0 ? i : order.Count + list.IndexOf(t);
+            }
+            return list.OrderBy(Pos).ToList();
+        }
+
+        void RebuildTabs()
+        {
+            var list = OrderedTabs();
             if (!list.SequenceEqual(Tabs))
             {
                 _suppressTab = true;
@@ -687,16 +735,30 @@ namespace GameLauncher
         /// <summary>Stretch tiles so each row fills the window width.</summary>
         void GamesList_SizeChanged(object sender, SizeChangedEventArgs e) => ApplyTileSize();
 
+        static bool Portrait => Store.S.CardLayout == "portrait";
+
         void ApplyTileSize()
         {
-            double minTile = Store.S.TileMinWidth;
+            // Portrait cards are narrower at the same "card size" so a similar number of games fits on screen.
+            double minTile = Store.S.TileMinWidth * (Portrait ? 0.72 : 1);
             const double margin = 12, scrollbar = 18;
             double avail = GamesList.ActualWidth - scrollbar;
             if (avail <= 0) return;
             int cols = Math.Max(1, (int)(avail / (minTile + margin)));
             double tile = Math.Floor(avail / cols - margin);
             Resources["TileWidth"] = tile;
-            Resources["ArtHeight"] = Math.Round(tile * 215.0 / 460.0);
+            Resources["ArtHeight"] = Math.Round(Portrait ? tile * 1.5 : tile * 215.0 / 460.0);
+        }
+
+        /// <summary>Names under the cards on/off: swaps the template resources.</summary>
+        void ApplyCardLook()
+        {
+            bool text = Store.S.ShowCardText;
+            Resources["CardTextVis"] = text ? Visibility.Visible : Visibility.Collapsed;
+            Resources["NameOverlayVis"] = text ? Visibility.Collapsed : Visibility.Visible;
+            Resources["CardTipOn"] = !text;
+            Resources["ArtCorner"] = text ? new CornerRadius(6, 6, 0, 0) : new CornerRadius(6);
+            Resources["IconMargin"] = text ? new Thickness(0) : new Thickness(0, 0, 0, 26);
         }
 
         int Columns()
@@ -833,13 +895,17 @@ namespace GameLauncher
                     if (ShowDlg(dlg))
                     {
                         var d = Store.Game(g.Key);
-                        TryDelete(d.CustomCover);
-                        var dest = Path.Combine(Store.CoverDir, $"custom_{Library.Normalize(g.Key)}_{DateTime.Now.Ticks}{Path.GetExtension(dlg.FileName)}");
+                        // A tall image becomes the portrait cover, a wide one the landscape cover.
+                        var probe = Covers.LoadImage(dlg.FileName, 64);
+                        bool tall = probe != null && probe.Height > probe.Width;
+                        TryDelete(tall ? d.CustomCoverPortrait : d.CustomCover);
+                        var dest = Path.Combine(Store.CoverDir, $"custom_{Library.Normalize(g.Key)}{(tall ? "_portrait" : "")}_{DateTime.Now.Ticks}{Path.GetExtension(dlg.FileName)}");
                         try
                         {
                             File.Copy(dlg.FileName, dest, true);
-                            d.CustomCover = dest;
+                            if (tall) d.CustomCoverPortrait = dest; else d.CustomCover = dest;
                             d.NoCover = false;
+                            Flash(tall ? "Portrait cover set" : "Landscape cover set");
                         }
                         catch (Exception ex) { Flash("Couldn't copy image: " + ex.Message); }
                         SaveSoon();
@@ -851,7 +917,9 @@ namespace GameLauncher
                 {
                     var d = Store.Game(g.Key);
                     TryDelete(d.CustomCover);
+                    TryDelete(d.CustomCoverPortrait);
                     d.CustomCover = null;
+                    d.CustomCoverPortrait = null;
                     d.NoCover = false;
                     if (g.SteamAppId == null && d.SteamAppId == null) d.SteamLookupDone = false;
                     SaveSoon();
@@ -862,7 +930,9 @@ namespace GameLauncher
                 {
                     var d = Store.Game(g.Key);
                     TryDelete(d.CustomCover);
+                    TryDelete(d.CustomCoverPortrait);
                     d.CustomCover = null;
+                    d.CustomCoverPortrait = null;
                     d.NoCover = true;
                     SaveSoon();
                     _ = LoadArt(g);
@@ -871,12 +941,9 @@ namespace GameLauncher
 
                 case "tags":
                 {
-                    var answer = InputDialog.Ask(this, "Tags", $"Tags for {g.Name}, separated by commas (for example: horror, coop, finished)",
-                        string.Join(", ", g.Tags));
-                    if (answer != null)
+                    var tags = InputDialog.AskTags(this, g.Name, g.Tags, Games.SelectMany(x => x.Tags));
+                    if (tags != null)
                     {
-                        var tags = answer.Split(',').Select(t => t.Trim()).Where(t => t.Length > 0)
-                                         .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                         Store.Game(g.Key).Tags = tags.Count > 0 ? tags : null;
                         g.Tags = tags;
                         SaveSoon();
@@ -947,7 +1014,16 @@ namespace GameLauncher
         {
             ApplyCollectionOrder(Games.OrderBy(g => g.SortKey, StringComparer.CurrentCultureIgnoreCase).ToList());
             _alphaReset = true;
-            Flash("Sorted A–Z  ·  click Done to keep it");
+            // Filters go back to their default order too.
+            var def = DefaultTabs();
+            _suppressTab = true;
+            for (int i = 0; i < def.Count; i++)
+            {
+                int cur = Tabs.IndexOf(def[i]);
+                if (cur >= 0 && cur != i) Tabs.Move(cur, i);
+            }
+            _suppressTab = false;
+            Flash("Games A–Z, filters in default order  ·  click Done to keep it");
         }
 
         void EnterArrange()
@@ -965,10 +1041,11 @@ namespace GameLauncher
             foreach (var g in Games) g.Arranging = true;
 
             ArrangeBar.Visibility = Visibility.Visible;
-            CountText.Visibility = Visibility.Collapsed;
-            ArrangeBtn.Foreground = (Brush)FindResource("AccentBrush");
+            TabsRight.Visibility = Visibility.Collapsed;
+            TabsList.Tag = "arranging";
+            Resources["TabGripVis"] = Visibility.Visible;
             SearchBox.IsEnabled = false;
-            Placeholder.Text = "Arrange mode — drag tiles to reorder, then click Done";
+            Placeholder.Text = "Arrange mode — drag tiles or filters to reorder, then click Done";
             SearchHint.Visibility = Visibility.Collapsed;
             RefreshView(keepSelection: true);
             GamesList.Focus();
@@ -978,19 +1055,24 @@ namespace GameLauncher
         {
             if (!_arranging) return;
             if (_dragging) EndDrag(true);
+            EndTabDrag();
             if (save)
             {
                 Store.S.CustomOrder = _alphaReset ? new List<string>() : Games.Select(g => g.Key).ToList();
                 _orderIndex = null;
+                var tabOrder = Tabs.Select(t => t.Value).ToList();
+                Store.S.TabOrder = tabOrder.SequenceEqual(DefaultTabs().Select(t => t.Value)) ? new List<string>() : tabOrder;
                 SaveSoon();
             }
             _arranging = false;
             foreach (var g in Games) g.Arranging = false;
             _view.CustomSort = new GameSorter(this);
+            RebuildTabs(); // on cancel this puts the filters back in their saved order
 
             ArrangeBar.Visibility = Visibility.Collapsed;
-            CountText.Visibility = Visibility.Visible;
-            ArrangeBtn.ClearValue(ForegroundProperty);
+            TabsRight.Visibility = Visibility.Visible;
+            TabsList.Tag = null;
+            Resources["TabGripVis"] = Visibility.Collapsed;
             SearchBox.IsEnabled = true;
             Placeholder.Text = DefaultPlaceholder;
             SearchHint.Visibility = Placeholder.Visibility;
@@ -1178,6 +1260,77 @@ namespace GameLauncher
             finally { _endingDrag = false; }
         }
 
+        // Filter tabs: drag to reorder while arranging. A plain click still switches the filter.
+        TabVm _tabDragItem;
+        bool _tabDragging;
+        Point _tabDragStart;
+
+        ListBoxItem TabContainerAt(Point p)
+        {
+            var hit = TabsList.InputHitTest(p) as DependencyObject;
+            while (hit != null && hit is not ListBoxItem)
+                hit = hit is Visual ? VisualTreeHelper.GetParent(hit) : LogicalTreeHelper.GetParent(hit);
+            return hit as ListBoxItem;
+        }
+
+        void TabsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!_arranging) return;
+            if (TabContainerAt(e.GetPosition(TabsList))?.DataContext is not TabVm t) return;
+            _tabDragItem = t;
+            _tabDragStart = e.GetPosition(TabsList);
+        }
+
+        void TabsList_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            if (!_arranging || _tabDragItem == null) return;
+            if (e.LeftButton != MouseButtonState.Pressed) { EndTabDrag(); return; }
+            var p = e.GetPosition(TabsList);
+            if (!_tabDragging)
+            {
+                if ((p - _tabDragStart).Length < 5) return;
+                _tabDragging = true;
+                TabsList.CaptureMouse();
+            }
+            var c = TabContainerAt(p);
+            if (c?.DataContext is not TabVm target || target == _tabDragItem) return;
+            int from = Tabs.IndexOf(_tabDragItem), to = Tabs.IndexOf(target);
+            if (from < 0 || to < 0) return;
+            // Only swap once the pointer is past the target's middle, so tabs of different widths don't flicker back and forth.
+            double x = Mouse.GetPosition(c).X;
+            if (from < to && x < c.ActualWidth / 2) return;
+            if (from > to && x > c.ActualWidth / 2) return;
+            _suppressTab = true;
+            Tabs.Move(from, to);
+            TabsList.SelectedItem = _tabDragItem;
+            _suppressTab = false;
+        }
+
+        void TabsList_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_tabDragging) e.Handled = true; // a drag isn't a click
+            EndTabDrag();
+        }
+
+        void TabsList_LostMouseCapture(object sender, MouseEventArgs e)
+        {
+            if (_tabDragging) EndTabDrag();
+        }
+
+        void EndTabDrag()
+        {
+            bool was = _tabDragging;
+            _tabDragging = false;
+            _tabDragItem = null;
+            if (was && TabsList.IsMouseCaptured) TabsList.ReleaseMouseCapture();
+            if (was && TabsList.SelectedItem is TabVm t && !t.Value.Equals(Tab, OIC))
+            {
+                Tab = t.Value;
+                RefreshView(keepSelection: false);
+                ApplyWallpaper();
+            }
+        }
+
         static T FindChild<T>(DependencyObject parent) where T : DependencyObject
         {
             for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
@@ -1226,6 +1379,26 @@ namespace GameLauncher
         }
 
         void CardReset_Click(object sender, RoutedEventArgs e) => SetTileSize(220);
+
+        void CardShape_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loadingSettings) return;
+            var layout = PortraitRadio.IsChecked == true ? "portrait" : "landscape";
+            if (layout == Store.S.CardLayout) return;
+            Store.S.CardLayout = layout;
+            SaveSoon();
+            ApplyTileSize();
+            ReloadAllArt();
+            Flash(layout == "portrait" ? "Portrait cards" : "Landscape cards");
+        }
+
+        void CardText_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loadingSettings) return;
+            Store.S.ShowCardText = CardTextBox.IsChecked == true;
+            ApplyCardLook();
+            SaveSoon();
+        }
 
         // ---------- wallpapers ----------
 
@@ -1434,6 +1607,9 @@ namespace GameLauncher
             var s = Store.S;
             CardSlider.Value = s.TileMinWidth;
             CardSizeText.Text = $"{s.TileMinWidth:0} px";
+            LandscapeRadio.IsChecked = !Portrait;
+            PortraitRadio.IsChecked = Portrait;
+            CardTextBox.IsChecked = s.ShowCardText;
             DimSlider.Value = s.WallpaperDim;
             BlurSlider.Value = s.WallpaperBlur;
             DimText.Text = $"{s.WallpaperDim * 100:0}%";

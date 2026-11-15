@@ -9,7 +9,9 @@ A small, native Windows 11 launcher for a folder of game shortcuts. Point it at 
 - **Trainers** — put trainer `.exe`s in a `z` subfolder; they're matched to games by name and get a TRAINER badge. Ctrl+Enter starts the game, then the trainer after a delay.
 - **Launcher bar** from a `Launchers` subfolder (Steam, Epic, EA, Battle.net, …).
 - **Filters** — Games (default), All, Recent, With trainer, one tab per subfolder (e.g. `Tools`), one per tag.
-- **Arrange mode** — drag and drop tiles into a custom order, Alt+arrows to nudge, reset to A–Z.
+- **Arrange mode** — drag and drop tiles and filter tabs into a custom order, Alt+arrows to nudge, reset to A–Z.
+- **Landscape or portrait cards** (portrait uses Steam's tall library art), with or without names under them.
+- **Tags** — the tag editor shows every tag already in use as a clickable pill.
 - **Per-filter wallpapers** with dim and blur, adjustable card size, Mica window, global hotkey (default `Win+Shift+G`), tray icon, start with Windows.
 
 ## Folder layout it understands
