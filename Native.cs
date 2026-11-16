@@ -28,6 +28,13 @@ namespace GameLauncher
             SetWindowLongPtr(hwnd, GWL_STYLE, new IntPtr(style & ~WS_SYSMENU));
         }
 
+        /// <summary>Windows 11 rounded corners (and the system's soft border) for a popup such as the tray menu.</summary>
+        public static void RoundCorners(IntPtr hwnd)
+        {
+            int round = 3; // DWMWCP_ROUNDSMALL
+            DwmSetWindowAttribute(hwnd, 33, ref round, 4); // DWMWA_WINDOW_CORNER_PREFERENCE
+        }
+
         public static void DarkTitleBar(IntPtr hwnd)
         {
             int on = 1;

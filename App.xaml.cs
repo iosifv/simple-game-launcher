@@ -65,7 +65,22 @@ namespace GameLauncher
                 Visible = true
             };
 
-            var menu = new WinForms.ContextMenuStrip();
+            // Dark like the app (WinForms menus don't follow the WPF theme on their own).
+            var menu = new WinForms.ContextMenuStrip
+            {
+                Renderer = new DarkMenuRenderer(),
+                BackColor = DarkMenuColors.Back,
+                ForeColor = DarkMenuColors.Text,
+                Font = new System.Drawing.Font("Segoe UI", 9.5f),
+                Padding = new WinForms.Padding(2, 4, 2, 4),
+                ShowImageMargin = true
+            };
+            menu.HandleCreated += (s, a) => Native.RoundCorners(menu.Handle);
+            menu.ItemAdded += (s, a) =>
+            {
+                a.Item.ForeColor = DarkMenuColors.Text;
+                if (a.Item is WinForms.ToolStripMenuItem) a.Item.Padding = new WinForms.Padding(4, 5, 4, 5);
+            };
             menu.Items.Add("Open launcher", null, (s, a) => _win.ShowLauncher());
             menu.Items.Add("Open shortcuts folder", null, (s, a) => OpenFolder(Store.S.Folder));
             menu.Items.Add(new WinForms.ToolStripSeparator());

@@ -62,10 +62,11 @@ namespace GameLauncher
         public string Trainer
         {
             get => _trainer;
-            set { if (Set(ref _trainer, value)) { Raise(nameof(HasTrainer)); Raise(nameof(TrainerTip)); } }
+            set { if (Set(ref _trainer, value)) { Raise(nameof(HasTrainer)); Raise(nameof(TrainerTip)); Raise(nameof(PlayTip)); } }
         }
         public bool HasTrainer => !string.IsNullOrEmpty(_trainer);
         public string TrainerTip => HasTrainer ? "Play with trainer: " + Path.GetFileNameWithoutExtension(_trainer) : null;
+        public string PlayTip => HasTrainer ? "Play  ·  Ctrl+click: play with trainer" : "Play";
         public List<string> Tags { get => _tags; set { _tags = value ?? new List<string>(); Raise(nameof(Tags)); Raise(nameof(SubText)); } }
         public DateTime? LastPlayed { get => _lastPlayed; set { if (Set(ref _lastPlayed, value)) Raise(nameof(SubText)); } }
 
@@ -163,6 +164,14 @@ namespace GameLauncher
         /// <summary>"landscape" (Steam header art) or "portrait" (Steam library art).</summary>
         public string CardLayout { get; set; } = "landscape";
         public bool ShowCardText { get; set; } = true;
+        /// <summary>Space between cards in px (each card gets half of it on every side).</summary>
+        public int CardSpacing { get; set; } = 12;
+        /// <summary>Mouse wheel scrolls the grid smoothly by exactly one row of cards.</summary>
+        public bool ScrollByRow { get; set; }
+        /// <summary>Colour of the random-game dice in the header (#RRGGBB).</summary>
+        public string DiceColor { get; set; } = "#60CDFF";
+        /// <summary>Start the game the dice lands on instead of just selecting it.</summary>
+        public bool DiceStartsGame { get; set; }
         public double WallpaperDim { get; set; } = 0.5;
         public double WallpaperBlur { get; set; } = 0;
         public Dictionary<string, GameData> Games { get; set; } = new Dictionary<string, GameData>(StringComparer.OrdinalIgnoreCase);
@@ -204,6 +213,8 @@ namespace GameLauncher
             if (s.CardLayout != "portrait") s.CardLayout = "landscape";
             if (string.IsNullOrWhiteSpace(s.DefaultTab)) s.DefaultTab = "games";
             s.TileMinWidth = Math.Clamp(s.TileMinWidth <= 0 ? 220 : s.TileMinWidth, 150, 420);
+            s.CardSpacing = Math.Clamp(s.CardSpacing, 0, 48);
+            if (string.IsNullOrWhiteSpace(s.DiceColor)) s.DiceColor = "#60CDFF";
             S = s;
         }
 

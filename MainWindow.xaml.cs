@@ -52,6 +52,7 @@ namespace GameLauncher
             Tab = Store.S.DefaultTab;
 
             ApplyCardLook();
+            ApplyDiceColor();
 
             _view = (ListCollectionView)CollectionViewSource.GetDefaultView(Games);
             _view.Filter = o => Matches((GameItem)o);
@@ -207,6 +208,7 @@ namespace GameLauncher
             Store.Load();
             ApplyCardLook();
             ApplyTileSize();
+            ApplyDiceColor();
             _orderIndex = null;
             RegisterHotkey();
             StartWatching();
@@ -772,7 +774,9 @@ namespace GameLauncher
         {
             // Portrait cards are narrower at the same "card size" so a similar number of games fits on screen.
             double minTile = Store.S.TileMinWidth * (Portrait ? 0.72 : 1);
-            const double margin = 12, scrollbar = 18, PanelPadX = 12 + 10; // WrapPanel margin in MainWindow.xaml
+            const double scrollbar = 18, PanelPadX = 12 + 10; // WrapPanel margin in MainWindow.xaml
+            double margin = Store.S.CardSpacing;               // the gap between cards
+            Resources["TileMargin"] = new Thickness(margin / 2);
             double avail = GamesList.ActualWidth - scrollbar - PanelPadX;
             if (avail <= 0) return;
             int cols = Math.Max(1, (int)(avail / (minTile + margin)));
@@ -849,10 +853,12 @@ namespace GameLauncher
             error = null;
             try
             {
+                // Shortcuts carry their own "Start in" folder (tools like SC2 Coop Overlay need it), so only
+                // programs get their own folder as the working directory.
                 Process.Start(new ProcessStartInfo(path)
                 {
                     UseShellExecute = true,
-                    WorkingDirectory = Path.GetDirectoryName(path) ?? ""
+                    WorkingDirectory = Library.IsShortcut(path) ? "" : Path.GetDirectoryName(path) ?? ""
                 });
                 return true;
             }
@@ -905,7 +911,7 @@ namespace GameLauncher
                     var dlg = new Microsoft.Win32.OpenFileDialog
                     {
                         Title = $"Choose a trainer for {g.Name}",
-                        Filter = "Programs and shortcuts|*.exe;*.lnk|All files|*.*",
+                        Filter = "Programs and shortcuts|*.exe;*.lnk;*.url|All files|*.*",
                         InitialDirectory = Directory.Exists(z) ? z : root
                     };
                     if (ShowDlg(dlg))
@@ -1201,12 +1207,12 @@ namespace GameLauncher
         }
 
         // ---------- tile hover effect ----------
-        // In: the card lifts and grows with a little spring, the art slowly zooms, a light sweeps across it
-        // and an accent glow fades in. Out: the card dips below its size and settles while the glow expands
-        // and dissolves. The glow (a DropShadowEffect) exists only while a card is hovered or fading out,
-        // so a big library scrolls as fast as before.
+        // In: the card (the whole rectangle; the image inside doesn't zoom) lifts and grows with a little spring,
+        // a light sweeps across the art, a glow in the cover's colour fades in and a play button pops up.
+        // Out: the card dips below its size and settles while the glow expands and dissolves. The glow
+        // (a DropShadowEffect) exists only while a card is hovered or fading out, so scrolling stays fast.
 
-        const double HoverScale = 1.06, HoverLift = -5, ArtZoom = 1.08, GlowBlur = 26, GlowOpacity = 0.7;
+        const double HoverScale = 1.06, HoverLift = -5, GlowBlur = 26, GlowOpacity = 0.7;
 
         void Tile_MouseEnter(object sender, MouseEventArgs e)
         {
@@ -1236,12 +1242,30 @@ namespace GameLauncher
             Animate(glow, DropShadowEffect.BlurRadiusProperty, GlowBlur, 320, smooth);
             Animate(glow, DropShadowEffect.OpacityProperty, GlowOpacity, 320, smooth);
 
-            foreach (var zoom in ArtZooms(item))
-            {
-                Animate(zoom, ScaleTransform.ScaleXProperty, ArtZoom, 900, smooth);
-                Animate(zoom, ScaleTransform.ScaleYProperty, ArtZoom, 900, smooth);
-            }
+            ShowPlay(item, true);
             Sweep(item);
+        }
+
+        /// <summary>The play button pops in (spring) on hover and shrinks away when the mouse leaves.</summary>
+        static void ShowPlay(ListBoxItem item, bool on)
+        {
+            if (item.Template.FindName("PlayBtn", item) is not Button play) return;
+            if (play.RenderTransform is not ScaleTransform s || s.IsFrozen)
+                play.RenderTransform = s = new ScaleTransform(0.75, 0.75);
+            play.IsHitTestVisible = on;
+            var ease = on ? (IEasingFunction)new BackEase { EasingMode = EasingMode.EaseOut, Amplitude = 0.6 }
+                          : new CubicEase { EasingMode = EasingMode.EaseIn };
+            int ms = on ? 300 : 180;
+            Animate(play, OpacityProperty, on ? 1 : 0, ms, null);
+            Animate(s, ScaleTransform.ScaleXProperty, on ? 1 : 0.75, ms, ease);
+            Animate(s, ScaleTransform.ScaleYProperty, on ? 1 : 0.75, ms, ease);
+        }
+
+        void PlayBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is not GameItem g) return;
+            GamesList.SelectedItem = g;
+            Launch(g, (Keyboard.Modifiers & ModifierKeys.Control) != 0);
         }
 
         void Tile_MouseLeave(object sender, MouseEventArgs e)
@@ -1257,11 +1281,7 @@ namespace GameLauncher
             scale.BeginAnimation(ScaleTransform.ScaleYProperty, settle.Clone());
             Animate(lift, TranslateTransform.YProperty, 0, 380, new CubicEase { EasingMode = EasingMode.EaseInOut });
 
-            foreach (var zoom in ArtZooms(item))
-            {
-                Animate(zoom, ScaleTransform.ScaleXProperty, 1, 450, new CubicEase { EasingMode = EasingMode.EaseOut });
-                Animate(zoom, ScaleTransform.ScaleYProperty, 1, 450, new CubicEase { EasingMode = EasingMode.EaseOut });
-            }
+            ShowPlay(item, false);
 
             if (item.Template.FindName("Shine", item) is Border shine)
                 Animate(shine, OpacityProperty, 0, 200, null);
@@ -1311,28 +1331,6 @@ namespace GameLauncher
             card.RenderTransformOrigin = new Point(0.5, 0.5);
             card.RenderTransform = new TransformGroup { Children = { s, t } };
             return (s, t);
-        }
-
-        /// <summary>Zoom transforms for whichever cover parts are showing: the image brushes zoom inside their
-        /// rounded corners, the letterboxed image scales (clipped by the art area).</summary>
-        static IEnumerable<ScaleTransform> ArtZooms(ListBoxItem item)
-        {
-            foreach (var name in new[] { "CoverFull", "CoverBackdrop" })
-                if (item.Template.FindName(name, item) is Border b && b.Background is ImageBrush brush && !brush.IsFrozen)
-                {
-                    if (brush.RelativeTransform is not ScaleTransform z || z.IsFrozen)
-                        brush.RelativeTransform = z = new ScaleTransform(1, 1, 0.5, 0.5);
-                    yield return z;
-                }
-            if (item.Template.FindName("CoverFitted", item) is Image img)
-            {
-                if (img.RenderTransform is not ScaleTransform z || z.IsFrozen)
-                {
-                    img.RenderTransformOrigin = new Point(0.5, 0.5);
-                    img.RenderTransform = z = new ScaleTransform(1, 1);
-                }
-                yield return z;
-            }
         }
 
         /// <summary>A soft diagonal band of light that crosses the art once.</summary>
@@ -1692,9 +1690,171 @@ namespace GameLauncher
 
         void GamesList_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
         {
-            if ((Keyboard.Modifiers & ModifierKeys.Control) == 0) return;
-            ChangeTileSize(e.Delta > 0 ? 20 : -20);
+            if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+            {
+                ChangeTileSize(e.Delta > 0 ? 20 : -20);
+                e.Handled = true;
+                return;
+            }
+            if (!Store.S.ScrollByRow) return;
             e.Handled = true;
+            // Touchpads send small deltas: a row per full notch (120).
+            _wheelAccum += e.Delta;
+            int rows = -(int)(_wheelAccum / 120);
+            if (rows == 0) return;
+            _wheelAccum %= 120;
+            ScrollRows(rows);
+        }
+
+        // ---------- smooth row scroll ----------
+        // With Settings.ScrollByRow the wheel glides (ease-out, ~0.3 s) to the next row boundary. Rows are
+        // card height + spacing apart; targets snap to that grid so the view always rests on a whole row.
+
+        double _wheelAccum, _scrollFrom, _scrollTarget;
+        DateTime _scrollStart;
+        bool _scrollAnimating;
+        const double ScrollMs = 300;
+
+        ScrollViewer GamesScroll => _gamesScroll ??= FindChild<ScrollViewer>(GamesList);
+
+        double RowHeight() =>
+            GamesList.ItemContainerGenerator.ContainerFromIndex(0) is FrameworkElement first && first.ActualHeight > 0
+                ? first.ActualHeight + Store.S.CardSpacing : 0;
+
+        void ScrollRows(int rows)
+        {
+            var sv = GamesScroll;
+            double row = RowHeight();
+            if (sv == null || row <= 0) return;
+            double basis = _scrollAnimating ? _scrollTarget : sv.VerticalOffset;
+            double target = Math.Clamp(Math.Round(basis / row) * row + rows * row, 0, sv.ScrollableHeight);
+            if (Math.Abs(target - sv.VerticalOffset) < 0.5) return;
+            _scrollFrom = sv.VerticalOffset;
+            _scrollTarget = target;
+            _scrollStart = DateTime.Now;
+            if (!_scrollAnimating)
+            {
+                _scrollAnimating = true;
+                CompositionTarget.Rendering += ScrollStep;
+            }
+        }
+
+        void ScrollStep(object sender, EventArgs e)
+        {
+            var sv = GamesScroll;
+            double t = sv == null ? 1 : Math.Min(1, (DateTime.Now - _scrollStart).TotalMilliseconds / ScrollMs);
+            double eased = 1 - Math.Pow(1 - t, 3);
+            sv?.ScrollToVerticalOffset(_scrollFrom + (_scrollTarget - _scrollFrom) * eased);
+            if (t >= 1)
+            {
+                _scrollAnimating = false;
+                CompositionTarget.Rendering -= ScrollStep;
+            }
+        }
+
+        void SpacingSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_loadingSettings || !IsLoaded) return;
+            Store.S.CardSpacing = (int)e.NewValue;
+            SpacingText.Text = $"{Store.S.CardSpacing} px";
+            ApplyTileSize();
+            SaveSoon();
+        }
+
+        // ---------- random game ----------
+        // The dice spins, the selection hops across the games on screen, slowing down, then lands on a random
+        // game from the current filter (scrolled into view). Settings.DiceStartsGame starts it too.
+
+        static readonly (string hex, string name)[] DiceColors =
+        {
+            ("#60CDFF", "Blue"), ("#FFFFFF", "White"), ("#FF5A5A", "Red"), ("#FFA94D", "Orange"),
+            ("#FFD84D", "Yellow"), ("#6EE07A", "Green"), ("#B388FF", "Purple"), ("#FF77C8", "Pink")
+        };
+        bool _rolling;
+
+        void ApplyDiceColor()
+        {
+            try
+            {
+                var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(Store.S.DiceColor));
+                b.Freeze();
+                Resources["DiceBrush"] = b;
+            }
+            catch { }
+        }
+
+        void BuildDiceSwatches()
+        {
+            DiceSwatches.Children.Clear();
+            foreach (var (hex, name) in DiceColors)
+            {
+                bool on = string.Equals(hex, Store.S.DiceColor, StringComparison.OrdinalIgnoreCase);
+                var ring = new Border
+                {
+                    Width = 26,
+                    Height = 26,
+                    CornerRadius = new CornerRadius(13),
+                    BorderThickness = new Thickness(2),
+                    BorderBrush = on ? (Brush)Application.Current.Resources["TextBrush"] : Brushes.Transparent,
+                    Padding = new Thickness(2),
+                    Margin = new Thickness(2, 0, 0, 0),
+                    Cursor = Cursors.Hand,
+                    ToolTip = name,
+                    Child = new System.Windows.Shapes.Ellipse { Fill = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)) }
+                };
+                ring.MouseLeftButtonUp += (s, e) =>
+                {
+                    Store.S.DiceColor = hex;
+                    ApplyDiceColor();
+                    BuildDiceSwatches();
+                    SaveSoon();
+                };
+                DiceSwatches.Children.Add(ring);
+            }
+        }
+
+        async void Dice_Click(object sender, RoutedEventArgs e) => await RollDice();
+
+        async Task RollDice()
+        {
+            if (_rolling || _arranging) return;
+            var pool = _view.Cast<GameItem>().ToList();
+            if (pool.Count == 0) { Flash("No games here to pick from"); return; }
+            _rolling = true;
+            try
+            {
+                var spin = new RotateTransform();
+                DiceIcon.RenderTransform = spin;
+                spin.BeginAnimation(RotateTransform.AngleProperty,
+                    new DoubleAnimation(0, 720, TimeSpan.FromMilliseconds(950)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+
+                var pick = pool[Random.Shared.Next(pool.Count)];
+                // Hop across the cards that are on screen, so the roll is visible without the grid jumping around.
+                var onScreen = pool.Where(IsOnScreen).ToList();
+                if (onScreen.Count > 1)
+                {
+                    GameItem last = null;
+                    for (int i = 0; i < 10; i++)
+                    {
+                        GameItem hop;
+                        do hop = onScreen[Random.Shared.Next(onScreen.Count)]; while (hop == last && onScreen.Count > 1);
+                        GamesList.SelectedItem = last = hop;
+                        await Task.Delay(45 + i * i * 4);
+                    }
+                }
+                GamesList.SelectedItem = pick;
+                GamesList.ScrollIntoView(pick);
+                if (Store.S.DiceStartsGame) Launch(pick, false);
+                else Flash($"Rolled {pick.Name}  ·  Enter or the play button to start, roll again for another");
+            }
+            finally { _rolling = false; }
+        }
+
+        bool IsOnScreen(GameItem g)
+        {
+            if (GamesList.ItemContainerGenerator.ContainerFromItem(g) is not FrameworkElement c || GamesScroll == null) return false;
+            var top = c.TranslatePoint(new Point(0, 0), GamesScroll).Y;
+            return top + c.ActualHeight > 0 && top < GamesScroll.ViewportHeight;
         }
 
         void CardSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -1959,6 +2119,11 @@ namespace GameLauncher
             LandscapeRadio.IsChecked = !Portrait;
             PortraitRadio.IsChecked = Portrait;
             CardTextBox.IsChecked = s.ShowCardText;
+            SpacingSlider.Value = s.CardSpacing;
+            SpacingText.Text = $"{s.CardSpacing} px";
+            ScrollByRowBox.IsChecked = s.ScrollByRow;
+            DiceStartsBox.IsChecked = s.DiceStartsGame;
+            BuildDiceSwatches();
             DimSlider.Value = s.WallpaperDim;
             BlurSlider.Value = s.WallpaperBlur;
             DimText.Text = $"{s.WallpaperDim * 100:0}%";
@@ -2076,6 +2241,8 @@ namespace GameLauncher
             s.CloseToTray = CloseToTrayBox.IsChecked == true;
             bool fetchBefore = s.FetchCovers;
             s.FetchCovers = FetchCoversBox.IsChecked == true;
+            s.ScrollByRow = ScrollByRowBox.IsChecked == true;
+            s.DiceStartsGame = DiceStartsBox.IsChecked == true;
             if (sender == StartupBox)
             {
                 try { StartupReg.Set(StartupBox.IsChecked == true); }

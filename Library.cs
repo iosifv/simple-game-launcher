@@ -108,9 +108,11 @@ namespace GameLauncher
                 {
                     foreach (var f in Files(dir, Deep))
                     {
+                        // Programs need "trainer" in the name (so helper tools like an auto-clicker stay out);
+                        // shortcuts (.lnk / .url) were put here on purpose and always count, e.g. "Starcraft.lnk".
                         var ext = Path.GetExtension(f);
-                        if ((ext.Equals(".exe", OIC) || ext.Equals(".lnk", OIC)) && Path.GetFileName(f).Contains("trainer", OIC))
-                            r.Trainers.Add(f);
+                        bool trainerExe = ext.Equals(".exe", OIC) && Path.GetFileName(f).Contains("trainer", OIC);
+                        if (trainerExe || IsShortcut(f)) r.Trainers.Add(f);
                     }
                 }
                 else if (!name.Equals("ICOS", OIC))
