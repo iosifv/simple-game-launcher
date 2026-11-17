@@ -20,6 +20,8 @@
         <Visibility x:Key="CardTextVis">Visible</Visibility>
         <Visibility x:Key="NameOverlayVis">Collapsed</Visibility>
         <Visibility x:Key="TabGripVis">Collapsed</Visibility>
+        <!-- Settings.TrainersEnabled (ApplyTrainerUi): trainer menu items and settings -->
+        <Visibility x:Key="TrainerVis">Visible</Visibility>
         <!-- Half of Settings.CardSpacing on each side of a card (ApplyTileSize) -->
         <Thickness x:Key="TileMargin">6</Thickness>
         <!-- Settings.DiceColor (ApplyDiceColor) -->
@@ -216,7 +218,8 @@
             <MenuItem Header="Play with trainer" InputGestureText="Ctrl+Enter" Tag="playtrainer" Click="Menu_Click"
                       IsEnabled="{Binding HasTrainer}" />
             <Separator />
-            <MenuItem Header="Trainer">
+            <!-- Both trainer items are hidden in Tile_ContextMenuOpening when trainers are off -->
+            <MenuItem Header="Trainer" Tag="trainermenu">
                 <MenuItem Header="Choose trainer…" Tag="settrainer" Click="Menu_Click" />
                 <MenuItem Header="Auto-detect from z folder" Tag="autotrainer" Click="Menu_Click" />
                 <MenuItem Header="No trainer" Tag="notrainer" Click="Menu_Click" />
@@ -844,7 +847,10 @@
                                         <TextBox x:Name="HotkeyBox" Grid.Column="1" IsReadOnly="True" IsReadOnlyCaretVisible="False"
                                                  HorizontalContentAlignment="Center" PreviewKeyDown="HotkeyBox_PreviewKeyDown" />
                                     </Grid>
-                                    <Grid Margin="0,14,0,0">
+                                    <CheckBox x:Name="TrainersBox" Content="Use trainers" Margin="0,14,0,0" Click="Option_Click" />
+                                    <TextBlock Style="{StaticResource Hint}" Margin="30,0,0,0"
+                                               Text="Off: no trainer badges, no &quot;With trainer&quot; filter, Ctrl+Enter just plays." />
+                                    <Grid Margin="0,10,0,0" Visibility="{DynamicResource TrainerVis}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="130" />
@@ -863,6 +869,8 @@
                                     <CheckBox x:Name="HideOnFocusLossBox" Content="Hide when I click another window" Margin="0,6,0,0" Click="Option_Click" />
                                     <CheckBox x:Name="CloseToTrayBox" Content="Close button hides to the tray" Margin="0,6,0,0" Click="Option_Click" />
                                     <CheckBox x:Name="FetchCoversBox" Content="Download cover art automatically" Margin="0,6,0,0" Click="Option_Click" />
+                                    <CheckBox x:Name="TipsBox" Content="Show tips when hovering" Margin="0,6,0,0" Click="Option_Click"
+                                              ToolTip="Game names, play and trainer hints, and what each button does" />
                                     <CheckBox x:Name="StartupBox" Content="Start with Windows (in the tray)" Margin="0,6,0,0" Click="Option_Click" />
                                 </StackPanel>
                             </Border>

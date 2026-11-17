@@ -172,6 +172,11 @@ namespace GameLauncher
         public string DiceColor { get; set; } = "#60CDFF";
         /// <summary>Start the game the dice lands on instead of just selecting it.</summary>
         public bool DiceStartsGame { get; set; }
+        /// <summary>Hover tooltips (game names, play / trainer hints, button descriptions). Off: none anywhere.</summary>
+        public bool ShowTips { get; set; } = true;
+        /// <summary>Trainers on/off. Off: no game gets a trainer, so badges, the "With trainer" filter,
+        /// trainer menus and Ctrl+Enter-with-trainer all go away.</summary>
+        public bool TrainersEnabled { get; set; } = true;
         public double WallpaperDim { get; set; } = 0.5;
         public double WallpaperBlur { get; set; } = 0;
         public Dictionary<string, GameData> Games { get; set; } = new Dictionary<string, GameData>(StringComparer.OrdinalIgnoreCase);

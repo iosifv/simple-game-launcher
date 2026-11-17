@@ -358,6 +358,12 @@ namespace GameLauncher
 
         void AssignTrainers()
         {
+            ApplyTrainerUi();
+            if (!Store.S.TrainersEnabled)
+            {
+                foreach (var g in Games) g.Trainer = null; // HasTrainer false everywhere: no badges, tab or menus
+                return;
+            }
             var candidates = _trainers
                 .Select(t => (path: t, key: Library.TrainerKey(t)))
                 .Where(x => x.key.Length > 0)
@@ -661,7 +667,8 @@ namespace GameLauncher
             {
                 int games = Games.Count(IsGame), other = Games.Count - games;
                 StatusText.Text = $"{games} games" + (other > 0 ? $"  ·  {other} tools" : "")
-                                  + $"  ·  {Games.Count(g => g.HasTrainer)} with trainers  ·  watching {Store.S.Folder}";
+                                  + (Store.S.TrainersEnabled ? $"  ·  {Games.Count(g => g.HasTrainer)} with trainers" : "")
+                                  + $"  ·  watching {Store.S.Folder}";
             }
             HotkeyText.Text = _hotkeyOk ? $"{Store.S.Hotkey}  show / hide" : $"Hotkey {Store.S.Hotkey} is taken — change it in settings";
             CountText.Text = _view.Count == Games.Count ? "" : $"{_view.Count} of {Games.Count}";
@@ -1195,6 +1202,9 @@ namespace GameLauncher
             // Cover actions apply to the card shape in use; say which.
             if ((sender as FrameworkElement)?.ContextMenu is not ContextMenu cm) return;
             var d = (sender as FrameworkElement).DataContext is GameItem g ? Store.Find(g.Key) : null;
+            foreach (var top in cm.Items.OfType<MenuItem>())
+                if (top.Tag is "playtrainer" or "trainermenu")
+                    top.Visibility = Store.S.TrainersEnabled ? Visibility.Visible : Visibility.Collapsed;
             foreach (var mi in cm.Items.OfType<MenuItem>().SelectMany(m => m.Items.OfType<MenuItem>()))
             {
                 if (mi.Tag is not string tag || !tag.Contains(':')) continue;
@@ -1772,6 +1782,14 @@ namespace GameLauncher
         };
         bool _rolling;
 
+        /// <summary>Trainer menu items, the trainer delay setting and the search hint follow Settings.TrainersEnabled.</summary>
+        void ApplyTrainerUi()
+        {
+            bool on = Store.S.TrainersEnabled;
+            Resources["TrainerVis"] = on ? Visibility.Visible : Visibility.Collapsed;
+            SearchHint.Text = on ? "Enter play   ·   Ctrl+Enter with trainer" : "Enter play";
+        }
+
         void ApplyDiceColor()
         {
             try
@@ -2138,6 +2156,8 @@ namespace GameLauncher
             HideOnFocusLossBox.IsChecked = s.HideOnFocusLoss;
             CloseToTrayBox.IsChecked = s.CloseToTray;
             FetchCoversBox.IsChecked = s.FetchCovers;
+            TipsBox.IsChecked = s.ShowTips;
+            TrainersBox.IsChecked = s.TrainersEnabled;
             StartupBox.IsChecked = StartupReg.IsEnabled();
             BuildWallpaperRows();
             _loadingSettings = false;
@@ -2243,6 +2263,14 @@ namespace GameLauncher
             s.FetchCovers = FetchCoversBox.IsChecked == true;
             s.ScrollByRow = ScrollByRowBox.IsChecked == true;
             s.DiceStartsGame = DiceStartsBox.IsChecked == true;
+            s.ShowTips = TipsBox.IsChecked == true;
+            if (s.TrainersEnabled != (TrainersBox.IsChecked == true))
+            {
+                s.TrainersEnabled = TrainersBox.IsChecked == true;
+                AssignTrainers();  // clears or re-detects every game's trainer
+                RebuildTabs();     // adds / removes "With trainer" (falls back to the first tab if it was open)
+                RefreshView(keepSelection: true);
+            }
             if (sender == StartupBox)
             {
                 try { StartupReg.Set(StartupBox.IsChecked == true); }

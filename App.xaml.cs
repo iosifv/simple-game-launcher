@@ -38,6 +38,10 @@ namespace GameLauncher
             base.OnStartup(e);
             Store.Load();
 
+            // Settings.ShowTips off: cancel every hover tooltip in every window, before it opens.
+            EventManager.RegisterClassHandler(typeof(FrameworkElement), FrameworkElement.ToolTipOpeningEvent,
+                new System.Windows.Controls.ToolTipEventHandler((s, a) => { if (!Store.S.ShowTips) a.Handled = true; }));
+
             _win = new MainWindow();
             MainWindow = _win;
             SetupTray();
