@@ -2,7 +2,7 @@
 
 A small, native Windows 11 launcher for a folder of game shortcuts. Point it at a folder full of `.lnk` / `.url` shortcuts and it turns them into a searchable grid of cover-art tiles: no browser, no account, no library import.
 
-![Simple Game Launcher: a grid of game covers with a launcher bar and filter tabs](docs/screenshots/main.jpg)
+![Simple Game Launcher: a grid of game covers with a launcher bar, filter tabs and the random-game dice](docs/screenshots/main.jpg)
 
 ## Download
 
@@ -12,6 +12,17 @@ A small, native Windows 11 launcher for a folder of game shortcuts. Point it at 
 
 It's a single file with everything included: no installer, nothing else to install. Windows may show a SmartScreen warning because the exe isn't signed: click **More info → Run anyway**.
 
+To update, replace `GameLauncher.exe` with the new one. Your settings, covers and wallpapers next to it are kept.
+
+## What's new
+
+- **Play button on hover:** point at a game and a ▶ button appears. Click to play, Ctrl+click to play with the trainer.
+- **Random game dice** in the title bar: it rolls across your games and lands on one. Pick its colour in Settings.
+- **Card spacing** slider and **scroll one row at a time** (smooth mouse-wheel scrolling).
+- **Turn trainers off** completely, and **turn hover tips off**, from Settings.
+- **Any shortcut in the `z` folder** now works as a trainer, not just `.exe` files.
+- **Dark tray menu**, and launchers can be reordered in Arrange mode.
+
 ## Features
 
 **Your games, at a glance**
@@ -19,28 +30,35 @@ It's a single file with everything included: no installer, nothing else to insta
 - **Find cover online…** (right-click a game → Cover): search Steam, the Microsoft Store and GOG yourself, preview the results and pick a landscape and a portrait image separately. Or use any image file.
 - **Landscape or portrait cards**, switched with one click, with or without names under them.
 - **Tiles without a cover** get a soft glow in the colours of the game's icon.
-- **Hover effect:** the card lifts, the art zooms, a light sweeps across it and it glows in the cover's own colours.
+- **Hover effect:** the card lifts, a light sweeps across it, it glows in the cover's own colours and a ▶ play button pops up.
+- **Spacing** between cards is adjustable, and the mouse wheel can **scroll one row at a time**.
 
 ![Portrait cards with names, Steam library art and an automatic Microsoft Store cover for Genshin Impact](docs/screenshots/portrait-cards.jpg)
 
 **Find and start games fast**
 - **Just start typing** to search by name, initials (`bmw` → Black Myth Wukong), tag or folder. Enter plays.
+- **Can't decide?** The dice in the title bar picks a random game from the filter you're on (and can start it for you).
 - **Launcher bar** with your store apps (Steam, Epic, EA, Battle.net, …) from a `Launchers` subfolder.
 - **Filters:** Games, All, Recent, With trainer, one tab per subfolder (e.g. `Tools`) and one per tag.
-- **Global hotkey** (default `Win+Shift+G`) and a tray icon: the launcher is always one keypress away.
+- **Global hotkey** (default `Win+Shift+G`) and a dark tray icon menu: the launcher is always one keypress away.
 - **Live folder watching:** add, remove or rename a shortcut and the grid updates within a second.
 
 **Make it yours**
 - **Arrange mode:** drag games, filter tabs and launchers into your own order. Alt+arrows nudge, Reset puts everything back A–Z.
 - **Tags** with a one-click tag editor.
 - **Wallpapers** per filter, with dim and blur. Adjustable card size, Mica window, start with Windows.
+- **Hover tips** (game names, play and trainer hints, button descriptions) can be switched off.
 
 ![Arrange mode: drag handles on every game, filter tab and launcher](docs/screenshots/arrange.jpg)
 
 **Trainers**
-- Put trainer `.exe`s in a `z` subfolder: they're matched to games by name and get a TRAINER badge. **Ctrl+Enter** starts the game, then the trainer after a delay you choose.
+- Put trainers in a `z` subfolder: `.exe` files with "trainer" in the name, or any shortcut (`.lnk` / `.url`), for example to a companion tool. They're matched to games by name and get a TRAINER badge.
+- **Ctrl+Enter** (or Ctrl+click on ▶) starts the game, then the trainer after a delay you choose.
+- Don't use trainers? Switch them off in Settings: the badges, the "With trainer" filter and the trainer menus disappear.
 
-![Settings: card size and shape, wallpapers per filter, games folder and hotkey](docs/screenshots/settings.jpg)
+| Cards, spacing, scrolling and the dice | General: trainers, tips and more |
+| --- | --- |
+| ![Settings: card size, shape, spacing, one-row scrolling and the random-game dice colour](docs/screenshots/settings.jpg) | ![Settings: games folder, hotkey, use trainers, trainer delay, show tips and other options](docs/screenshots/settings-general.jpg) |
 
 ## Folder layout it understands
 
@@ -49,7 +67,7 @@ My Games Folder\
 ├─ Some Game.lnk           ← games (any .lnk / .url)
 ├─ Another Game.url
 ├─ Launchers\              ← shown as the launcher bar
-├─ z\                      ← trainers (*Trainer*.exe / .lnk), matched to games by name
+├─ z\                      ← trainers (*Trainer*.exe, or any .lnk / .url), matched to games by name
 └─ Tools\                  ← any other subfolder becomes its own filter tab
                              (Tools is excluded from the Games filter)
 ```
@@ -72,7 +90,7 @@ Epic doesn't allow outside apps to search its store, but many Epic games are als
 | --- | --- |
 | type anything | search (name, initials like `bmw`, tags, folder) |
 | Arrows · Enter | select · play |
-| Ctrl+Enter | play with trainer |
+| Ctrl+Enter | play with trainer (when trainers are on) |
 | Esc | clear search / hide |
 | Ctrl+Tab | next filter |
 | Ctrl + / − / 0, Ctrl+wheel | card size |
@@ -103,6 +121,6 @@ The published `app\GameLauncher.exe` is a single file. On first start it opens S
 Push a version tag and GitHub Actions builds the self-contained exe and publishes the release:
 
 ```powershell
-git tag v1.0.2
-git push origin v1.0.2
+git tag v1.0.4
+git push origin v1.0.4
 ```
