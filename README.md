@@ -59,6 +59,26 @@ Search, the random-game dice and one **⋯** menu. Everything else is a click aw
 
 ![The ⋯ menu: Settings, Rescan folder, Open shortcuts folder, Exit](docs/screenshots/more-menu.jpg)
 
+### See the difference
+
+Each part of the look has its own switch in **Settings → Look**. Here is each one switched off and on, with everything else the same:
+
+**Game art in the background.** The selected game's artwork fills the window, and its name and details appear above the filters.
+
+![Game art off: the plain window over the desktop. On: Black Myth Wukong's artwork behind everything, with its name above the filters](docs/screenshots/compare-hero.jpg)
+
+**Accent colour from the game.** The selection ring and the active filter take the cover's colour instead of the default blue.
+
+![Accent default: a blue ring and blue Games tab. From the game: a gold ring and gold Games tab for Black Myth Wukong](docs/screenshots/compare-accent.jpg)
+
+**Spotlight.** Point at a card and the rest of the grid steps back. You choose how much it dims, from 10 to 90%.
+
+![Spotlight off: every card at full brightness while pointing at Hellraiser. On: the other cards dimmed](docs/screenshots/compare-spot.jpg)
+
+**Compact title bar.** Rescan, open folder and settings fold into one ⋯ menu.
+
+![Full title bar with rescan, folder and settings buttons, and the compact one with just the dice and a ⋯ menu](docs/screenshots/compare-header.jpg)
+
 ### Make it yours
 
 - **Arrange mode:** drag games, filter tabs and launchers into your own order. Alt+arrows nudge, Reset puts everything back A–Z.
