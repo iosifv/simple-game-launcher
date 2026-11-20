@@ -54,6 +54,56 @@ namespace GameLauncher
             return w.ShowDialog() == true ? result : null;
         }
 
+        /// <summary>"Delete this shortcut?" with the file path and a red Delete button. Cancel is the default
+        /// (Enter / Esc), so a stray key press never deletes. True = delete.</summary>
+        public static bool ConfirmDelete(Window owner, string name, string path)
+        {
+            var w = MakeWindow(owner, "Delete");
+            var delete = new Button { Content = "Delete", MinWidth = 90, Margin = new Thickness(0, 0, 8, 0) };
+            var cancel = new Button { Content = "Cancel", IsDefault = true, IsCancel = true, MinWidth = 90 };
+            delete.Loaded += (s, e) =>
+            {
+                // Red button: set after the theme applied its template.
+                delete.Background = Res("DangerBrush");
+                delete.Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x10, 0x10));
+                delete.BorderBrush = Res("DangerBrush");
+            };
+            bool result = false;
+            delete.Click += (s, e) => { result = true; w.DialogResult = true; };
+
+            var root = new StackPanel { Margin = new Thickness(20) };
+            root.Children.Add(new TextBlock
+            {
+                Text = $"Delete {name}?",
+                FontSize = 15,
+                FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 6)
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = "This file is moved to the Recycle Bin and disappears from the launcher. "
+                     + "Only the shortcut is removed: the game itself stays installed.",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Res("SecondaryBrush"),
+                Margin = new Thickness(0, 0, 0, 10)
+            });
+            root.Children.Add(new TextBlock
+            {
+                Text = path,
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11.5,
+                Foreground = Res("MutedBrush"),
+                Margin = new Thickness(0, 0, 0, 18)
+            });
+            root.Children.Add(Buttons(delete, cancel));
+            w.Content = root;
+
+            w.SourceInitialized += (s, e) => Native.DarkTitleBar(new WindowInteropHelper(w).Handle);
+            w.Loaded += (s, e) => cancel.Focus();
+            return w.ShowDialog() == true && result;
+        }
+
         public static List<string> Parse(string text) =>
             (text ?? "").Split(',').Select(t => t.Trim()).Where(t => t.Length > 0)
                         .Distinct(StringComparer.OrdinalIgnoreCase).ToList();

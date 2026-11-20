@@ -47,8 +47,7 @@ namespace GameLauncher
         public MainWindow()
         {
             InitializeComponent();
-            Width = Math.Max(MinWidth, Store.S.Width);
-            Height = Math.Max(MinHeight, Store.S.Height);
+            RestoreWindowPlacement();
             Tab = Store.S.DefaultTab;
 
             ApplyCardLook();
@@ -75,19 +74,16 @@ namespace GameLauncher
             {
                 bool max = WindowState == WindowState.Maximized;
                 RootBorder.Margin = max ? new Thickness(7) : new Thickness(0);
+                SaveWindowPlacement();
                 MaxBtn.Content = max ? "" : "";
             };
             SizeChanged += (s, e) =>
             {
                 // The app name in the header gives way to the search box on narrow windows.
                 AppTitle.Visibility = ActualWidth >= 960 ? Visibility.Visible : Visibility.Collapsed;
-                if (IsLoaded && WindowState == WindowState.Normal)
-                {
-                    Store.S.Width = ActualWidth;
-                    Store.S.Height = ActualHeight;
-                    SaveSoon();
-                }
+                SaveWindowPlacement();
             };
+            LocationChanged += (s, e) => SaveWindowPlacement();
             Deactivated += (s, e) =>
             {
                 if (Store.S.HideOnFocusLoss && !_dialogOpen && OwnedWindows.Count == 0 && !AnyContextMenuOpen()) Hide();
@@ -110,6 +106,7 @@ namespace GameLauncher
         void OnSourceInitialized(object sender, EventArgs e)
         {
             _hwnd = new WindowInteropHelper(this).Handle;
+            ApplySavedPlacement();
             var src = HwndSource.FromHwnd(_hwnd);
             src.AddHook(WndProc);
             if (Native.TryMica(_hwnd))
@@ -185,10 +182,50 @@ namespace GameLauncher
             else MaxBtn.ClearValue(BackgroundProperty);
         }
 
+        // ---------- window placement ----------
+        // The window comes back on the same monitor, at the same size, maximized or not. Saved with Windows' own
+        // placement (Settings.WindowBounds = normal bounds in real screen pixels, which identifies the monitor even
+        // when monitors use different scaling) plus Settings.Maximized. Restored in OnSourceInitialized, before the
+        // window is first shown, so it never appears in the wrong place first. If that monitor is gone, the window
+        // opens centred on the main screen at the last size (Settings.Width/Height).
+
+        void RestoreWindowPlacement()
+        {
+            Width = Math.Max(MinWidth, Store.S.Width);
+            Height = Math.Max(MinHeight, Store.S.Height);
+        }
+
+        /// <summary>Called from OnSourceInitialized: the window handle exists but nothing is on screen yet.</summary>
+        void ApplySavedPlacement()
+        {
+            var s = Store.S;
+            if (Native.SetNormalBounds(_hwnd, s.WindowBounds))
+                WindowStartupLocation = WindowStartupLocation.Manual; // keep WPF from re-centring it
+            // Maximizes on the monitor of the normal bounds just set (or the main screen if they were unusable).
+            if (s.Maximized) WindowState = WindowState.Maximized;
+        }
+
+        void SaveWindowPlacement()
+        {
+            if (!IsLoaded || _hwnd == IntPtr.Zero || WindowState == WindowState.Minimized) return;
+            var s = Store.S;
+            var bounds = Native.GetNormalBounds(_hwnd);
+            if (bounds == null) return;
+            s.WindowBounds = bounds;
+            s.Maximized = WindowState == WindowState.Maximized;
+            if (WindowState == WindowState.Normal)
+            {
+                s.Width = ActualWidth;   // fallback size if the monitor is gone next time
+                s.Height = ActualHeight;
+            }
+            SaveSoon();
+        }
+
         public void ShowLauncher()
         {
             if (!IsVisible) Show();
-            if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+            // From the taskbar / hotkey: come back maximized if it was.
+            if (WindowState == WindowState.Minimized) WindowState = Store.S.Maximized ? WindowState.Maximized : WindowState.Normal;
             Activate();
             Topmost = true; Topmost = false;
             Native.SetForegroundWindow(_hwnd);
@@ -219,6 +256,8 @@ namespace GameLauncher
 
         protected override void OnClosing(CancelEventArgs e)
         {
+            SaveWindowPlacement();
+            Store.Save(); // the debounced save may not get to run if the app exits now
             if (!AllowClose)
             {
                 e.Cancel = true;
@@ -588,7 +627,7 @@ namespace GameLauncher
             foreach (var f in Games.Select(g => g.Folder).Where(f => !string.IsNullOrEmpty(f)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f))
                 list.Add(new TabVm(f, "folder:" + f));
             foreach (var t in Games.SelectMany(g => g.Tags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t))
-                list.Add(new TabVm("#" + t, "tag:" + t));
+                list.Add(new TabVm(t, "tag:" + t)); // shown with a tag icon (TabStyle)
             return list;
         }
 
@@ -1017,9 +1056,46 @@ namespace GameLauncher
                     break;
 
                 case "reveal":
-                    try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{g.FilePath}\"") { UseShellExecute = true }); } catch { }
+                    Reveal(g.FilePath);
+                    break;
+
+                case "delete":
+                    if (DeleteShortcut(g.Name, g.FilePath)) Games.Remove(g); // the folder watcher's rescan confirms it
                     break;
             }
+        }
+
+        static void Reveal(string path)
+        {
+            try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"") { UseShellExecute = true }); } catch { }
+        }
+
+        /// <summary>The one place the launcher changes the shortcuts folder: after a confirmation, the file goes to
+        /// the Recycle Bin (restorable). Saved data for the game (tags, covers, play history) is kept, so restoring
+        /// the file brings everything back. True if it was deleted.</summary>
+        bool DeleteShortcut(string name, string path)
+        {
+            if (!InputDialog.ConfirmDelete(this, name, path)) return false;
+            var error = Native.RecycleFile(path);
+            if (error != null)
+            {
+                Flash($"Couldn't delete {name}: {error}");
+                return false;
+            }
+            Flash($"Deleted {name}  ·  it's in the Recycle Bin if you want it back");
+            QueueRescan();
+            return true;
+        }
+
+        void LauncherReveal_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is LauncherItem l) Reveal(l.FilePath);
+        }
+
+        void LauncherDelete_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is LauncherItem l && DeleteShortcut(l.Name, l.FilePath))
+                Launchers.Remove(l);
         }
 
         void AfterTrainerChange()

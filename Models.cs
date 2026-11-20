@@ -107,13 +107,18 @@ namespace GameLauncher
         public ImageSource Icon { get => _icon; set => Set(ref _icon, value); }
     }
 
-    public record TabVm(string Label, string Value);
+    public record TabVm(string Label, string Value)
+    {
+        /// <summary>Tag filters show a tag icon before the name (instead of a "#").</summary>
+        public bool IsTag => Value.StartsWith("tag:", StringComparison.OrdinalIgnoreCase);
+    }
 
     public class WallpaperRow : Notify
     {
         bool _isCurrent;
         public string Label { get; set; }
         public string Key { get; set; }
+        public bool IsTag => Key?.StartsWith("tag:", StringComparison.OrdinalIgnoreCase) == true;
         public string Note { get; set; }
         public ImageSource Thumb { get; set; }
         public bool HasImage => Thumb != null;
@@ -149,6 +154,11 @@ namespace GameLauncher
         public bool FetchCovers { get; set; } = true;
         public double Width { get; set; } = 1180;
         public double Height { get; set; } = 760;
+        /// <summary>Last normal (not maximized) window bounds [left, top, right, bottom] in screen pixels; this also
+        /// records which monitor it was on. Null = centre on the main screen (first start).</summary>
+        public int[] WindowBounds { get; set; }
+        /// <summary>The window was maximized (on the monitor of WindowBounds) when last closed / hidden.</summary>
+        public bool Maximized { get; set; }
         public double TileMinWidth { get; set; } = 220;
         public string DefaultTab { get; set; } = "games";
         /// <summary>Subfolders whose shortcuts are not games (excluded from the Games filter).</summary>

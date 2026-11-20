@@ -11,6 +11,8 @@
             <SolidColorBrush x:Key="SecondaryBrush" Color="#B9B9C3" />
             <SolidColorBrush x:Key="MutedBrush" Color="#868690" />
             <SolidColorBrush x:Key="AccentBrush" Color="#60CDFF" />
+            <!-- Destructive actions (Delete) -->
+            <SolidColorBrush x:Key="DangerBrush" Color="#FF6B6B" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

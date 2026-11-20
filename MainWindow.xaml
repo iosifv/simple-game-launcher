@@ -240,6 +240,14 @@
             <MenuItem Header="Arrange games…" Tag="arrange" Click="Menu_Click" />
             <Separator />
             <MenuItem Header="Show in File Explorer" Tag="reveal" Click="Menu_Click" />
+            <Separator />
+            <!-- Moves the shortcut file to the Recycle Bin after a confirmation (DeleteShortcut) -->
+            <MenuItem Header="Delete…" Tag="delete" Click="Menu_Click" Foreground="{StaticResource DangerBrush}">
+                <MenuItem.Icon>
+                    <TextBlock Text="&#xE74D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                               Foreground="{StaticResource DangerBrush}" />
+                </MenuItem.Icon>
+            </MenuItem>
         </ContextMenu>
 
         <ContextMenu x:Key="TabMenu" x:Shared="False">
@@ -371,6 +379,10 @@
                                 <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
                                            Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,1,7,0"
                                            Visibility="{DynamicResource TabGripVis}" />
+                                <!-- Tag filters: tag icon instead of "#" -->
+                                <TextBlock x:Name="TagIcon" Text="&#xE8EC;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                                           Foreground="{Binding Foreground, ElementName=T}" VerticalAlignment="Center" Margin="0,1,6,0"
+                                           Visibility="{Binding IsTag, Converter={StaticResource BoolVis}}" />
                                 <TextBlock x:Name="T" Text="{Binding Label}" FontSize="12.5"
                                            Foreground="{StaticResource SecondaryBrush}" />
                             </StackPanel>
@@ -527,6 +539,18 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Button Style="{StaticResource PillBtn}" Click="Launcher_Click" ToolTip="{Binding FilePath}">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Show in File Explorer" Click="LauncherReveal_Click" />
+                                    <Separator />
+                                    <MenuItem Header="Delete…" Click="LauncherDelete_Click" Foreground="{StaticResource DangerBrush}">
+                                        <MenuItem.Icon>
+                                            <TextBlock Text="&#xE74D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                                                       Foreground="{StaticResource DangerBrush}" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Button.ContextMenu>
                             <StackPanel Orientation="Horizontal">
                                 <!-- Arrange-mode grip, like the filter tabs -->
                                 <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
@@ -763,7 +787,12 @@
                                                         </Border>
                                                     </Border>
                                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                        <TextBlock x:Name="L" Text="{Binding Label}" FontSize="13" />
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <TextBlock Text="&#xE8EC;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                                                                       Foreground="{Binding Foreground, ElementName=L}" VerticalAlignment="Center"
+                                                                       Margin="0,1,6,0" Visibility="{Binding IsTag, Converter={StaticResource BoolVis}}" />
+                                                            <TextBlock x:Name="L" Text="{Binding Label}" FontSize="13" />
+                                                        </StackPanel>
                                                         <TextBlock Text="{Binding Note}" FontSize="11" Foreground="{StaticResource MutedBrush}"
                                                                    TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
                                                     </StackPanel>

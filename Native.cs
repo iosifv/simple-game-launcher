@@ -21,6 +21,79 @@ namespace GameLauncher
         [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] static extern IntPtr GetWindowLongPtr(IntPtr h, int i);
         [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] static extern IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);
 
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        struct SHFILEOPSTRUCT
+        {
+            public IntPtr hwnd;
+            public uint wFunc;
+            public string pFrom;
+            public string pTo;
+            public ushort fFlags;
+            public bool fAnyOperationsAborted;
+            public IntPtr hNameMappings;
+            public string lpszProgressTitle;
+        }
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode)] static extern int SHFileOperation(ref SHFILEOPSTRUCT op);
+
+        /// <summary>Moves one file to the Recycle Bin (restorable), without Explorer's own prompts.
+        /// Returns null on success, otherwise an error message.</summary>
+        public static string RecycleFile(string path)
+        {
+            const uint FO_DELETE = 3;
+            const ushort FOF_SILENT = 0x4, FOF_NOCONFIRMATION = 0x10, FOF_ALLOWUNDO = 0x40, FOF_NOERRORUI = 0x400;
+            if (!System.IO.File.Exists(path)) return "The file no longer exists.";
+            var op = new SHFILEOPSTRUCT
+            {
+                wFunc = FO_DELETE,
+                pFrom = path + "\0\0", // double-null-terminated list
+                fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI
+            };
+            int rc = SHFileOperation(ref op);
+            if (rc != 0) return $"Windows couldn't delete it (error 0x{rc:X}). It may be in use or read-only.";
+            if (op.fAnyOperationsAborted) return "The delete was cancelled.";
+            return System.IO.File.Exists(path) ? "The file is still there." : null;
+        }
+
+        // ---- window placement (multi-monitor aware: real pixels on the whole desktop) ----
+        [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+        [StructLayout(LayoutKind.Sequential)] struct POINT { public int X, Y; }
+        [StructLayout(LayoutKind.Sequential)]
+        struct WINDOWPLACEMENT
+        {
+            public int length, flags, showCmd;
+            public POINT minPosition, maxPosition;
+            public RECT normalPosition;
+        }
+        [DllImport("user32.dll")] static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT wp);
+        [DllImport("user32.dll")] static extern bool SetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT wp);
+        [DllImport("user32.dll")] static extern IntPtr MonitorFromRect(ref RECT r, uint flags);
+
+        /// <summary>The window's normal (not maximized) bounds as [left, top, right, bottom] in screen pixels,
+        /// which also pins down the monitor it's on.</summary>
+        public static int[] GetNormalBounds(IntPtr hwnd)
+        {
+            var wp = new WINDOWPLACEMENT { length = Marshal.SizeOf<WINDOWPLACEMENT>() };
+            if (!GetWindowPlacement(hwnd, ref wp)) return null;
+            var r = wp.normalPosition;
+            return r.Right > r.Left && r.Bottom > r.Top ? new[] { r.Left, r.Top, r.Right, r.Bottom } : null;
+        }
+
+        /// <summary>Puts a not-yet-shown window at saved normal bounds, if they are still on a connected monitor
+        /// (most of the title bar must be on one). Doesn't show the window. False = bounds unusable.</summary>
+        public static bool SetNormalBounds(IntPtr hwnd, int[] b)
+        {
+            if (b == null || b.Length != 4 || b[2] - b[0] < 100 || b[3] - b[1] < 100) return false;
+            var titleBar = new RECT { Left = b[0] + 40, Top = b[1], Right = b[2] - 40, Bottom = b[1] + 40 };
+            const uint MONITOR_DEFAULTTONULL = 0;
+            if (MonitorFromRect(ref titleBar, MONITOR_DEFAULTTONULL) == IntPtr.Zero) return false; // monitor gone
+            var wp = new WINDOWPLACEMENT { length = Marshal.SizeOf<WINDOWPLACEMENT>() };
+            if (!GetWindowPlacement(hwnd, ref wp)) return false;
+            wp.showCmd = 0; // SW_HIDE: just move it; WPF shows it (normal or maximized) afterwards
+            wp.flags = 0;
+            wp.normalPosition = new RECT { Left = b[0], Top = b[1], Right = b[2], Bottom = b[3] };
+            return SetWindowPlacement(hwnd, ref wp);
+        }
+
         public static void RemoveSysMenu(IntPtr hwnd)
         {
             const int GWL_STYLE = -16; const long WS_SYSMENU = 0x00080000;
