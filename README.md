@@ -16,6 +16,7 @@ To update, replace `GameLauncher.exe` with the new one. Your settings, covers an
 
 ## What's new
 
+- **New look:** point at or select a game and the window fills with its Steam artwork, its name shows above the filters, the highlight colour follows its cover, and the other cards dim a little (spotlight). The title bar is tidier, with settings, rescan and open folder under a ⋯ menu. Each of them can be switched off in Settings → Look.
 - **Hide games** you don't want to see (right-click → Hide). They move to a **Hidden** filter, where Show again brings them back. The shortcut file stays where it is.
 - **Delete…** (right-click a game or launcher) moves the shortcut to the Recycle Bin after asking.
 - **Remembers where the window was**: same monitor, same size, or maximized, also with several monitors.
@@ -35,6 +36,7 @@ To update, replace `GameLauncher.exe` with the new one. Your settings, covers an
 - **Landscape or portrait cards**, switched with one click, with or without names under them.
 - **Tiles without a cover** get a soft glow in the colours of the game's icon.
 - **Hover effect:** the card lifts, a light sweeps across it, it glows in the cover's own colours and a ▶ play button pops up.
+- **Game art in the background:** the game you point at or select fills the window with its wide Steam artwork (or a soft blur of its cover), and the accent colour follows it.
 - **Spacing** between cards is adjustable, and the mouse wheel can **scroll one row at a time**.
 
 ![Portrait cards with names, Steam library art and an automatic Microsoft Store cover for Genshin Impact](docs/screenshots/portrait-cards.jpg)

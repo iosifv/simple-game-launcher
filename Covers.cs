@@ -49,10 +49,29 @@ namespace GameLauncher
             return null;
         }
 
+        public static string CachedHeroPath(int appId) => Path.Combine(Store.CoverDir, $"steam_{appId}_hero.jpg");
+
+        static readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> NoHero = new();
+
+        /// <summary>Steam "library hero" (wide 3840×1240 background art) for the hero background. Misses are remembered
+        /// for this session.</summary>
+        public static async Task<string> EnsureSteamHero(int appId)
+        {
+            var path = CachedHeroPath(appId);
+            if (File.Exists(path)) return path;
+            if (NoHero.ContainsKey(appId)) return null;
+            if (await TryDownload($"https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{appId}/library_hero.jpg", path))
+                return path;
+            if ((await GetAssets(new[] { appId })).TryGetValue(appId, out var a) && a.Hero != null && await TryDownload(a.Hero, path))
+                return path;
+            NoHero[appId] = true;
+            return null;
+        }
+
         /// <summary>Real art URLs for a Steam app. Older apps use fixed file names, newer ones hashed paths.</summary>
         public class SteamAssets
         {
-            public string Header, Capsule, Library, Library2x;
+            public string Header, Capsule, Library, Library2x, Hero;
             public string[] LandscapeUrls => new[] { Header, Capsule }.Where(u => u != null).ToArray();
             public string[] PortraitUrls => new[] { Library2x, Library }.Where(u => u != null).ToArray();
         }
@@ -86,7 +105,8 @@ namespace GameLauncher
                         Header = U("header"),
                         Capsule = U("main_capsule"),
                         Library = U("library_capsule"),
-                        Library2x = U("library_capsule_2x")
+                        Library2x = U("library_capsule_2x"),
+                        Hero = U("library_hero")
                     };
                 }
             }

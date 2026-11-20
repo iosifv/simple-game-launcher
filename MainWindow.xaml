@@ -26,6 +26,9 @@
         <Thickness x:Key="TileMargin">6</Thickness>
         <!-- Settings.DiceColor (ApplyDiceColor) -->
         <SolidColorBrush x:Key="DiceBrush" Color="#60CDFF" />
+        <!-- Shadows App's AccentBrush in this window; replaced from code with a brush whose colour follows
+             the game in focus (ApplyAccent). Always use it as DynamicResource here. -->
+        <SolidColorBrush x:Key="AccentBrush" Color="#60CDFF" />
         <sys:Boolean x:Key="CardTipOn">False</sys:Boolean>
         <CornerRadius x:Key="ArtCorner">6,6,0,0</CornerRadius>
         <Thickness x:Key="IconMargin">0</Thickness>
@@ -166,22 +169,50 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="B" CornerRadius="29" Background="#B3101014" BorderBrush="#66FFFFFF" BorderThickness="1.5">
-                            <Border.Effect>
-                                <DropShadowEffect ShadowDepth="2" BlurRadius="14" Opacity="0.5" Color="Black" />
-                            </Border.Effect>
+                        <!-- Hover: an accent-coloured layer (F) and a dark play glyph (G2) fade in over the dark
+                             button, and fade back out when the mouse leaves -->
+                        <Grid x:Name="Root">
+                            <Border CornerRadius="29" Background="#B3101014" BorderBrush="#66FFFFFF" BorderThickness="1.5">
+                                <Border.Effect>
+                                    <DropShadowEffect ShadowDepth="2" BlurRadius="14" Opacity="0.5" Color="Black" />
+                                </Border.Effect>
+                            </Border>
+                            <Border x:Name="F" CornerRadius="29" Background="{DynamicResource AccentBrush}"
+                                    BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1.5" Opacity="0" />
                             <TextBlock x:Name="G" Text="&#xF5B0;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="20"
                                        Foreground="{TemplateBinding Foreground}" HorizontalAlignment="Center"
                                        VerticalAlignment="Center" Margin="3,0,0,0" />
-                        </Border>
+                            <TextBlock x:Name="G2" Text="&#xF5B0;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="20"
+                                       Foreground="#101014" HorizontalAlignment="Center" Opacity="0"
+                                       VerticalAlignment="Center" Margin="3,0,0,0" />
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="B" Property="Background" Value="{StaticResource AccentBrush}" />
-                                <Setter TargetName="B" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
-                                <Setter TargetName="G" Property="Foreground" Value="#101014" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="F" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.22">
+                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="G2" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.22" />
+                                            <DoubleAnimation Storyboard.TargetName="G" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.22" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="F" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.35">
+                                                <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseInOut" /></DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="G2" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.35" />
+                                            <DoubleAnimation Storyboard.TargetName="G" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.35" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="B" Property="Opacity" Value="0.85" />
+                                <Setter TargetName="Root" Property="Opacity" Value="0.85" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -325,7 +356,7 @@
                                             HorizontalAlignment="Left" VerticalAlignment="Top"
                                             Visibility="{Binding Arranging, Converter={StaticResource BoolVis}}">
                                         <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
-                                                   Foreground="{StaticResource AccentBrush}" />
+                                                   Foreground="{DynamicResource AccentBrush}" />
                                     </Border>
                                 </Grid>
                                 <StackPanel Margin="10,7,10,9" Visibility="{DynamicResource CardTextVis}">
@@ -357,12 +388,12 @@
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="Card" Property="Background" Value="#CC2A2A32" />
-                                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                             </Trigger>
                             <!-- The tile being dragged leaves a faint placeholder behind -->
                             <DataTrigger Binding="{Binding IsDragging}" Value="True">
                                 <Setter TargetName="Card" Property="Opacity" Value="0.25" />
-                                <Setter TargetName="Card" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Card" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                             </DataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -383,7 +414,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <!-- Arrange-mode grip -->
                                 <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
-                                           Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,1,7,0"
+                                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,1,7,0"
                                            Visibility="{DynamicResource TabGripVis}" />
                                 <!-- Tag filters: tag icon instead of "#" -->
                                 <TextBlock x:Name="TagIcon" Text="&#xE8EC;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
@@ -402,7 +433,7 @@
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
                                 <Setter TargetName="B" Property="Background" Value="#3360CDFF" />
-                                <Setter TargetName="T" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="T" Property="Foreground" Value="{DynamicResource AccentBrush}" />
                                 <Setter TargetName="T" Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                             <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource AncestorType=ListBox}}" Value="arranging">
@@ -444,7 +475,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="B" Background="{StaticResource AccentBrush}" CornerRadius="5" Padding="16,5">
+                        <Border x:Name="B" Background="{DynamicResource AccentBrush}" CornerRadius="5" Padding="16,5">
                             <ContentPresenter HorizontalAlignment="Center" TextElement.Foreground="#0B1A24"
                                               TextElement.FontWeight="SemiBold" TextElement.FontSize="12" />
                         </Border>
@@ -473,6 +504,24 @@
             <Image x:Name="WallpaperImage" Grid.RowSpan="5" Stretch="UniformToFill" Opacity="0"
                    RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False" />
             <Rectangle x:Name="WallpaperShade" Grid.RowSpan="5" Fill="#0E0E12" Opacity="0" IsHitTestVisible="False" />
+
+            <!-- Hero background: wide art of the game in focus, cross-faded between two images (ShowHero) -->
+            <Grid x:Name="HeroLayer" Grid.RowSpan="5" Opacity="0" IsHitTestVisible="False" ClipToBounds="True">
+                <Image x:Name="HeroA" Stretch="UniformToFill" VerticalAlignment="Top" Opacity="0"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <Image x:Name="HeroB" Stretch="UniformToFill" VerticalAlignment="Top" Opacity="0"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <Rectangle>
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#800E0E12" Offset="0" />
+                            <GradientStop Color="#330E0E12" Offset="0.2" />
+                            <GradientStop Color="#9E0E0E12" Offset="0.55" />
+                            <GradientStop Color="#D90E0E12" Offset="1" />
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </Grid>
 
             <!-- Header: icon + search + actions, all in the title bar -->
             <Grid Grid.Row="0">
@@ -518,9 +567,35 @@
                             </Grid>
                         </Viewbox>
                     </Button>
-                    <Button Style="{StaticResource HeaderBtn}" Content="&#xE72C;" ToolTip="Rescan folder (F5)" Click="Refresh_Click" />
-                    <Button Style="{StaticResource HeaderBtn}" Content="&#xE838;" ToolTip="Open shortcuts folder" Click="OpenFolder_Click" />
+                    <!-- Full header: these three; compact header (ApplyHeaderLook): the ⋯ menu instead -->
+                    <Button x:Name="RefreshBtn" Style="{StaticResource HeaderBtn}" Content="&#xE72C;" ToolTip="Rescan folder (F5)" Click="Refresh_Click" />
+                    <Button x:Name="FolderBtn" Style="{StaticResource HeaderBtn}" Content="&#xE838;" ToolTip="Open shortcuts folder" Click="OpenFolder_Click" />
                     <Button x:Name="SettingsBtn" Style="{StaticResource HeaderBtn}" Content="&#xE713;" ToolTip="Settings (Ctrl+,)" Click="Settings_Click" />
+                    <Button x:Name="MoreBtn" Style="{StaticResource HeaderBtn}" Content="&#xE712;" ToolTip="More" Click="More_Click"
+                            Visibility="Collapsed">
+                        <Button.ContextMenu>
+                            <!-- A context menu inherits fonts from its button: reset the icon font the header buttons use -->
+                            <ContextMenu FontFamily="{x:Static SystemFonts.MessageFontFamily}" FontSize="14">
+                                <MenuItem Header="Settings" InputGestureText="Ctrl+," Click="Settings_Click">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Rescan folder" InputGestureText="F5" Click="Refresh_Click">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="Open shortcuts folder" Click="OpenFolder_Click">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="&#xE838;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <Separator />
+                                <MenuItem Header="Exit" Click="Exit_Click" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
                     <Border Width="1" Height="18" Background="#22FFFFFF" Margin="8,0,4,0" />
                 </StackPanel>
                 <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Top">
@@ -535,7 +610,8 @@
 
             <!-- Launchers -->
             <!-- Drag to reorder in arrange mode (LaunchersBar_* handlers) -->
-            <ItemsControl x:Name="LaunchersBar" Grid.Row="1" Margin="20,8,20,0"
+            <StackPanel Grid.Row="1">
+            <ItemsControl x:Name="LaunchersBar" Margin="20,8,20,0"
                           PreviewMouseLeftButtonDown="LaunchersBar_PreviewMouseLeftButtonDown"
                           PreviewMouseMove="LaunchersBar_PreviewMouseMove"
                           PreviewMouseLeftButtonUp="LaunchersBar_PreviewMouseLeftButtonUp"
@@ -563,7 +639,7 @@
                             <StackPanel Orientation="Horizontal">
                                 <!-- Arrange-mode grip, like the filter tabs -->
                                 <TextBlock Text="&#xE700;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="10"
-                                           Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,1,7,0"
+                                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,1,7,0"
                                            Visibility="{DynamicResource TabGripVis}" />
                                 <Image Source="{Binding Icon}" Width="18" Height="18"
                                        RenderOptions.BitmapScalingMode="HighQuality" />
@@ -574,6 +650,18 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- Name of the game in focus, over the hero background (UpdateHeroInfo). Fixed height so the grid
+                 doesn't jump while pointing at different games. -->
+            <StackPanel x:Name="HeroInfo" Height="52" Margin="24,12,24,0" Visibility="Collapsed" IsHitTestVisible="False">
+                <TextBlock x:Name="HeroName" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis">
+                    <TextBlock.Effect>
+                        <DropShadowEffect ShadowDepth="0" BlurRadius="10" Opacity="0.6" />
+                    </TextBlock.Effect>
+                </TextBlock>
+                <TextBlock x:Name="HeroSub" FontSize="12" Foreground="{StaticResource SecondaryBrush}" Margin="1,2,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            </StackPanel>
 
             <!-- Filter tabs -->
             <Grid Grid.Row="2" Margin="16,4,22,4">
@@ -620,7 +708,7 @@
                         Background="#E6141A20" BorderBrush="#6660CDFF" BorderThickness="1" CornerRadius="8" Padding="12,5,6,5">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE8CB;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
-                                   Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                   Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" Margin="0,0,8,0" />
                         <TextBlock VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SecondaryBrush}"
                                    Text="Drag tiles, filters or launchers  ·  Alt+arrows nudge" Margin="0,0,14,0" />
                         <Button Style="{StaticResource SmallBtn}" Content="Reset to A–Z" Click="ArrangeReset_Click" Focusable="False" />
@@ -750,6 +838,38 @@
                                 </StackPanel>
                             </Border>
 
+                            <!-- Window look (each switch on its own, so any of them can be turned back off) -->
+                            <Border Style="{StaticResource SectionCard}">
+                                <StackPanel>
+                                    <TextBlock Text="Look" Style="{StaticResource SectionTitle}" />
+                                    <CheckBox x:Name="HeroBox" Content="Game art in the background" Margin="0,8,0,0" Click="Look_Click" />
+                                    <TextBlock Style="{StaticResource Hint}" Margin="30,0,0,0"
+                                               Text="The game you point at or select fills the window with its art, and its name shows above the filters." />
+                                    <CheckBox x:Name="AccentBox" Content="Accent colour from the game" Margin="0,10,0,0" Click="Look_Click" />
+                                    <TextBlock Style="{StaticResource Hint}" Margin="30,0,0,0"
+                                               Text="Highlights take the colour of that game's cover." />
+                                    <CheckBox x:Name="SpotlightBox" Content="Spotlight the card under the mouse" Margin="0,10,0,0" Click="Look_Click" />
+                                    <TextBlock Style="{StaticResource Hint}" Margin="30,0,0,0"
+                                               Text="The other cards dim a little while you point at one." />
+                                    <Grid Margin="30,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="44" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Dim others" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0" />
+                                        <Slider x:Name="SpotlightSlider" Grid.Column="1" Minimum="10" Maximum="90" TickFrequency="5"
+                                                IsSnapToTickEnabled="True" SmallChange="5" LargeChange="10"
+                                                ValueChanged="SpotlightSlider_ValueChanged" />
+                                        <TextBlock x:Name="SpotlightText" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                   FontSize="12" Foreground="{StaticResource SecondaryBrush}" />
+                                    </Grid>
+                                    <CheckBox x:Name="CompactHeaderBox" Content="Compact title bar" Margin="0,10,0,0" Click="Look_Click" />
+                                    <TextBlock Style="{StaticResource Hint}" Margin="30,0,0,0"
+                                               Text="Settings, rescan and open folder move into the ⋯ menu." />
+                                </StackPanel>
+                            </Border>
+
                             <!-- Random game (dice in the header) -->
                             <Border Style="{StaticResource SectionCard}">
                                 <StackPanel>
@@ -819,7 +939,7 @@
                                                 </Grid>
                                                 <DataTemplate.Triggers>
                                                     <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                                                        <Setter TargetName="L" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                                        <Setter TargetName="L" Property="Foreground" Value="{DynamicResource AccentBrush}" />
                                                         <Setter TargetName="L" Property="FontWeight" Value="SemiBold" />
                                                     </DataTrigger>
                                                 </DataTemplate.Triggers>

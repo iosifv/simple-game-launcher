@@ -52,6 +52,7 @@ namespace GameLauncher
 
             ApplyCardLook();
             ApplyDiceColor();
+            InitLook();
 
             _view = (ListCollectionView)CollectionViewSource.GetDefaultView(Games);
             _view.Filter = o => Matches((GameItem)o);
@@ -80,12 +81,13 @@ namespace GameLauncher
             SizeChanged += (s, e) =>
             {
                 // The app name in the header gives way to the search box on narrow windows.
-                AppTitle.Visibility = ActualWidth >= 960 ? Visibility.Visible : Visibility.Collapsed;
+                AppTitle.Visibility = !Store.S.CompactHeader && ActualWidth >= 960 ? Visibility.Visible : Visibility.Collapsed;
                 SaveWindowPlacement();
             };
             LocationChanged += (s, e) => SaveWindowPlacement();
             Deactivated += (s, e) =>
             {
+                Spotlight(null); // e.g. a game started from a card: don't come back with the grid dimmed
                 if (Store.S.HideOnFocusLoss && !_dialogOpen && OwnedWindows.Count == 0 && !AnyContextMenuOpen()) Hide();
             };
         }
@@ -526,7 +528,9 @@ namespace GameLauncher
         async Task ShowCover(GameItem g, int ver, string path)
         {
             var (img, fill) = await Task.Run(() => (Covers.LoadImage(path), Covers.LoadImage(path, 24)));
-            if (ver == g.ArtVersion) SetCover(g, img, fill);
+            if (ver != g.ArtVersion) return;
+            SetCover(g, img, fill);
+            if (g == FocusGame) { _heroGame = null; FocusSoon(); } // its accent / hero can use the new art now
         }
 
         static void SetCover(GameItem g, ImageSource img, ImageSource fill)
@@ -1208,6 +1212,7 @@ namespace GameLauncher
         void EnterArrange()
         {
             if (_arranging) return;
+            Spotlight(null);
             if (SettingsPanel.Visibility == Visibility.Visible) ToggleSettings();
             if (SearchBox.Text.Length > 0) SearchBox.Clear();
 
@@ -1362,6 +1367,33 @@ namespace GameLauncher
 
             ShowPlay(item, true);
             Sweep(item);
+
+            _hoverGame = item.DataContext as GameItem; // hero background + accent follow the pointer
+            FocusSoon();
+            if (Store.S.Spotlight) Spotlight(item);
+        }
+
+        bool _spotlit;
+        static double SpotlightOpacity => 1 - Math.Clamp(Store.S.SpotlightDim, 10, 90) / 100.0;
+
+        void SpotlightSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_loadingSettings || !IsLoaded) return;
+            Store.S.SpotlightDim = (int)Math.Round(e.NewValue);
+            SpotlightText.Text = $"{Store.S.SpotlightDim}%";
+            SaveSoon();
+        }
+
+        /// <summary>Spotlight (Settings.Spotlight): every other card fades a little while one is hovered; null brings
+        /// them all back. Uses the ListBoxItem's opacity (the Card's is used while dragging).</summary>
+        void Spotlight(ListBoxItem on)
+        {
+            if (on == null && !_spotlit) return;
+            _spotlit = on != null;
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            foreach (var it in GamesList.Items)
+                if (GamesList.ItemContainerGenerator.ContainerFromItem(it) is ListBoxItem c)
+                    Animate(c, OpacityProperty, on == null || c == on ? 1 : SpotlightOpacity, on == null ? 320 : 240, ease);
         }
 
         /// <summary>The play button pops in (spring) on hover and shrinks away when the mouse leaves.</summary>
@@ -1426,7 +1458,7 @@ namespace GameLauncher
         /// else the accent. Cached per image, so a new cover gets a new colour.</summary>
         static Color GlowColor(GameItem g)
         {
-            var accent = ((SolidColorBrush)Application.Current.Resources["AccentBrush"]).Color;
+            var accent = DefaultAccent; // not the window's accent, which itself follows this colour
             var src = (g?.CoverFill ?? g?.Cover ?? g?.Icon) as System.Windows.Media.Imaging.BitmapSource;
             if (src == null) return accent;
             if (GlowColors.TryGetValue(src, out var cached)) return (Color)cached;
@@ -2266,6 +2298,13 @@ namespace GameLauncher
             FetchCoversBox.IsChecked = s.FetchCovers;
             TipsBox.IsChecked = s.ShowTips;
             TrainersBox.IsChecked = s.TrainersEnabled;
+            HeroBox.IsChecked = s.HeroBackground;
+            AccentBox.IsChecked = s.AccentFromGame;
+            CompactHeaderBox.IsChecked = s.CompactHeader;
+            SpotlightBox.IsChecked = s.Spotlight;
+            SpotlightSlider.Value = s.SpotlightDim;
+            SpotlightText.Text = $"{s.SpotlightDim}%";
+            SpotlightSlider.IsEnabled = s.Spotlight;
             StartupBox.IsChecked = StartupReg.IsEnabled();
             BuildWallpaperRows();
             _loadingSettings = false;
@@ -2389,6 +2428,199 @@ namespace GameLauncher
         }
 
         void OpenDataFolder_Click(object sender, RoutedEventArgs e) => App.OpenFolder(Store.Dir);
+
+        // ---------- look: hero background, game accent, compact header ----------
+        // Each has its own switch (Settings → Look). The "game in focus" is the card under the pointer, else the
+        // selected one; changes are debounced so sweeping the mouse across the grid doesn't flicker.
+
+        static readonly Color DefaultAccent = Color.FromRgb(0x60, 0xCD, 0xFF);
+        Color _accentTarget = DefaultAccent;
+        GameItem _hoverGame, _heroGame;
+        ImageSource _heroShown;
+        DispatcherTimer _focusTimer;
+        int _heroVer;
+        bool _heroFrontA;
+        readonly Dictionary<string, ImageSource> _heroCache = new Dictionary<string, ImageSource>(StringComparer.OrdinalIgnoreCase);
+
+        void InitLook()
+        {
+            _focusTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+            _focusTimer.Tick += (s, e) => { _focusTimer.Stop(); UpdateFocusLook(); };
+            GamesList.SelectionChanged += (s, e) => FocusSoon();
+            // Leaving the grid (not just a card: the gaps between cards keep the last one) goes back to the selection.
+            GamesList.MouseLeave += (s, e) => { _hoverGame = null; FocusSoon(); Spotlight(null); };
+            ApplyHeaderLook();
+        }
+
+        GameItem FocusGame => _hoverGame ?? GamesList.SelectedItem as GameItem;
+
+        void FocusSoon()
+        {
+            _focusTimer.Stop();
+            _focusTimer.Start();
+        }
+
+        async void UpdateFocusLook()
+        {
+            var s = Store.S;
+            var g = FocusGame;
+            if (g != null && !_view.Contains(g)) g = GamesList.SelectedItem as GameItem;
+            ApplyAccent(s.AccentFromGame ? g : null);
+            UpdateHeroInfo(s.HeroBackground ? g : null);
+
+            if (!s.HeroBackground) g = null;
+            if (g == _heroGame && (g == null || _heroShown != null)) return;
+            _heroGame = g;
+            int ver = ++_heroVer;
+            var img = g == null ? null : await HeroImageFor(g);
+            if (ver != _heroVer) return;
+            ShowHero(img);
+        }
+
+        void UpdateHeroInfo(GameItem g)
+        {
+            HeroInfo.Visibility = Store.S.HeroBackground ? Visibility.Visible : Visibility.Collapsed;
+            HeroName.Text = g?.Name ?? "";
+            if (g == null) { HeroSub.Text = ""; return; }
+            var parts = new List<string>();
+            if (!string.IsNullOrEmpty(g.SubText)) parts.Add(g.SubText);
+            else parts.Add("Not played from here yet");
+            if (g.HasTrainer) parts.Add("Trainer ready");
+            HeroSub.Text = string.Join("  ·  ", parts);
+        }
+
+        /// <summary>Steam's wide library hero when the game is on Steam (downloaded once, cached in covers\), else the
+        /// cover's tiny copy stretched up — a soft blur of its colours. Null when there's no art at all.</summary>
+        async Task<ImageSource> HeroImageFor(GameItem g)
+        {
+            int? id = g.SteamAppId ?? Store.Find(g.Key)?.SteamAppId;
+            if (id != null && Store.Find(g.Key)?.NoCover != true)
+            {
+                var path = Covers.CachedHeroPath(id.Value);
+                if (!File.Exists(path) && Store.S.FetchCovers)
+                {
+                    await NetGate.WaitAsync();
+                    try { path = await Covers.EnsureSteamHero(id.Value); }
+                    finally { NetGate.Release(); }
+                }
+                if (path != null && File.Exists(path))
+                {
+                    if (!_heroCache.TryGetValue(path, out var img))
+                    {
+                        img = await Task.Run(() => Covers.LoadImage(path, 1920));
+                        if (_heroCache.Count > 24) _heroCache.Clear();
+                        _heroCache[path] = img;
+                    }
+                    if (img != null) return img;
+                }
+            }
+            return g.CoverFill;
+        }
+
+        void ShowHero(ImageSource img)
+        {
+            _heroShown = img;
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            if (img == null)
+            {
+                Animate(HeroLayer, OpacityProperty, 0, 300, ease);
+                return;
+            }
+            var (front, back) = _heroFrontA ? (HeroA, HeroB) : (HeroB, HeroA);
+            bool layerWasHidden = HeroLayer.Opacity < 0.01;
+            back.Source = img;
+            if (layerWasHidden)
+            {
+                front.BeginAnimation(OpacityProperty, null); front.Opacity = 0;
+                back.BeginAnimation(OpacityProperty, null); back.Opacity = 1;
+            }
+            else
+            {
+                Animate(back, OpacityProperty, 1, 380, ease);
+                Animate(front, OpacityProperty, 0, 380, ease);
+            }
+            _heroFrontA = !_heroFrontA;
+            Animate(HeroLayer, OpacityProperty, 1, 300, ease);
+        }
+
+        /// <summary>Glides the window's accent to a bright, readable version of the game's cover colour (or back to the
+        /// default blue when g is null).</summary>
+        void ApplyAccent(GameItem g)
+        {
+            var target = g == null ? DefaultAccent : ReadableAccent(GlowColor(g));
+            if (target == _accentTarget) return;
+            _accentTarget = target;
+            _accentFrom = _accentNow;
+            _accentStart = DateTime.UtcNow;
+            if (!_accentAnimating) { _accentAnimating = true; CompositionTarget.Rendering += AccentTick; }
+        }
+
+        // Styles and templates freeze the brushes they use, so the colour can't be animated in place: each frame of
+        // the ~300 ms glide puts a new (frozen) brush in the window's AccentBrush resource instead.
+        Color _accentFrom = DefaultAccent, _accentNow = DefaultAccent;
+        DateTime _accentStart;
+        bool _accentAnimating;
+
+        void AccentTick(object sender, EventArgs e)
+        {
+            double t = Math.Min(1, (DateTime.UtcNow - _accentStart).TotalMilliseconds / 300);
+            double k = 1 - Math.Pow(1 - t, 3);
+            byte L(byte a, byte b) => (byte)Math.Round(a + (b - a) * k);
+            _accentNow = Color.FromRgb(L(_accentFrom.R, _accentTarget.R), L(_accentFrom.G, _accentTarget.G), L(_accentFrom.B, _accentTarget.B));
+            var brush = new SolidColorBrush(_accentNow);
+            brush.Freeze();
+            Resources["AccentBrush"] = brush;
+            if (t >= 1) { CompositionTarget.Rendering -= AccentTick; _accentAnimating = false; }
+        }
+
+        /// <summary>Same hue, but saturated enough to read as a colour and bright enough for text on the dark theme.</summary>
+        static Color ReadableAccent(Color c)
+        {
+            double r = c.R / 255.0, gg = c.G / 255.0, b = c.B / 255.0;
+            double max = Math.Max(r, Math.Max(gg, b)), min = Math.Min(r, Math.Min(gg, b)), d = max - min;
+            if (d < 0.08) return DefaultAccent; // grey cover: keep the default
+            double h = max == r ? 60 * (((gg - b) / d) % 6) : max == gg ? 60 * ((b - r) / d + 2) : 60 * ((r - gg) / d + 4);
+            if (h < 0) h += 360;
+            double s = Math.Clamp(d / max, 0.4, 0.72);
+            return Covers.FromHsv(h, s, 1.0);
+        }
+
+        void ApplyHeaderLook()
+        {
+            bool compact = Store.S.CompactHeader;
+            var full = compact ? Visibility.Collapsed : Visibility.Visible;
+            RefreshBtn.Visibility = full;
+            FolderBtn.Visibility = full;
+            SettingsBtn.Visibility = full;
+            MoreBtn.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+            AppTitle.Visibility = !compact && ActualWidth >= 960 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        void More_Click(object sender, RoutedEventArgs e)
+        {
+            var menu = MoreBtn.ContextMenu;
+            menu.PlacementTarget = MoreBtn;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+
+        void Exit_Click(object sender, RoutedEventArgs e) => ((App)Application.Current).ExitApp();
+
+        void Look_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loadingSettings) return;
+            var s = Store.S;
+            s.HeroBackground = HeroBox.IsChecked == true;
+            s.AccentFromGame = AccentBox.IsChecked == true;
+            s.CompactHeader = CompactHeaderBox.IsChecked == true;
+            s.Spotlight = SpotlightBox.IsChecked == true;
+            if (!s.Spotlight) Spotlight(null);
+            SpotlightSlider.IsEnabled = s.Spotlight;
+            ApplyHeaderLook();
+            _heroGame = null; _heroShown = null; // re-evaluate now
+            UpdateFocusLook();
+            SaveSoon();
+        }
 
         // ---------- title bar ----------
 

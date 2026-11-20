@@ -166,6 +166,16 @@ namespace GameLauncher
         public int[] WindowBounds { get; set; }
         /// <summary>The window was maximized (on the monitor of WindowBounds) when last closed / hidden.</summary>
         public bool Maximized { get; set; }
+        /// <summary>The game you point at (or the selected one) shows its wide art behind everything, with its name above the filters.</summary>
+        public bool HeroBackground { get; set; } = true;
+        /// <summary>The accent colour (selected filter, selection ring, highlights) follows that game's cover colour.</summary>
+        public bool AccentFromGame { get; set; } = true;
+        /// <summary>Header shows only search, dice and a ⋯ menu (settings, rescan, open folder, exit).</summary>
+        public bool CompactHeader { get; set; } = true;
+        /// <summary>While a card is hovered, the other cards dim a little.</summary>
+        public bool Spotlight { get; set; } = true;
+        /// <summary>How much the other cards dim, in percent (10–90).</summary>
+        public int SpotlightDim { get; set; } = 50;
         public double TileMinWidth { get; set; } = 220;
         public string DefaultTab { get; set; } = "games";
         /// <summary>Subfolders whose shortcuts are not games (excluded from the Games filter).</summary>
