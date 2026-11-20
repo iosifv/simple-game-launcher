@@ -10,7 +10,7 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
     <AssemblyName>GameLauncher</AssemblyName>
     <RootNamespace>GameLauncher</RootNamespace>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <Product>Simple Game Launcher</Product>
   </PropertyGroup>
 
