@@ -2526,6 +2526,9 @@ namespace GameLauncher
                 Animate(HeroLayer, OpacityProperty, 0, 300, ease);
                 return;
             }
+            // Bright art (a yellow Counter-Strike hero, a light cover blur) would wash out the text over it:
+            // the brighter the picture, the more extra shade.
+            Animate(HeroSoftShade, OpacityProperty, Math.Clamp((Brightness(img) - 0.22) * 1.5, 0, 0.62), 380, ease);
             var (front, back) = _heroFrontA ? (HeroA, HeroB) : (HeroB, HeroA);
             bool layerWasHidden = HeroLayer.Opacity < 0.01;
             back.Source = img;
@@ -2541,6 +2544,31 @@ namespace GameLauncher
             }
             _heroFrontA = !_heroFrontA;
             Animate(HeroLayer, OpacityProperty, 1, 300, ease);
+        }
+
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ImageSource, object> Brightnesses = new();
+
+        /// <summary>Average brightness (0–1) of an image, from a 32 px wide copy. Cached per image.</summary>
+        static double Brightness(ImageSource img)
+        {
+            if (img is not System.Windows.Media.Imaging.BitmapSource src || src.PixelWidth == 0) return 0;
+            if (Brightnesses.TryGetValue(img, out var cached)) return (double)cached;
+            double result = 0;
+            try
+            {
+                double k = Math.Min(1, 32.0 / src.PixelWidth);
+                var small = new System.Windows.Media.Imaging.FormatConvertedBitmap(
+                    new System.Windows.Media.Imaging.TransformedBitmap(src, new ScaleTransform(k, k)), PixelFormats.Bgra32, null, 0);
+                int w = small.PixelWidth, h = small.PixelHeight;
+                var px = new byte[w * h * 4];
+                small.CopyPixels(px, w * 4, 0);
+                double sum = 0;
+                for (int i = 0; i < px.Length; i += 4) sum += 0.0722 * px[i] + 0.7152 * px[i + 1] + 0.2126 * px[i + 2];
+                result = sum / (w * h) / 255.0;
+            }
+            catch { }
+            Brightnesses.AddOrUpdate(img, result);
+            return result;
         }
 
         /// <summary>Glides the window's accent to a bright, readable version of the game's cover colour (or back to the

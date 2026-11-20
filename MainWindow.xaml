@@ -117,13 +117,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="B" CornerRadius="14" Padding="12,5,13,5" Background="Transparent"
+                        <!-- Dark tint so the chips stay readable over bright hero art -->
+                        <Border x:Name="B" CornerRadius="14" Padding="12,5,13,5" Background="#47000000"
                                 BorderBrush="#1FFFFFFF" BorderThickness="1">
                             <ContentPresenter />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="B" Property="Background" Value="#1AFFFFFF" />
+                                <Setter TargetName="B" Property="Background" Value="#33FFFFFF" />
                                 <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
@@ -511,11 +512,13 @@
                        RenderOptions.BitmapScalingMode="HighQuality" />
                 <Image x:Name="HeroB" Stretch="UniformToFill" VerticalAlignment="Top" Opacity="0"
                        RenderOptions.BitmapScalingMode="HighQuality" />
+                <!-- Extra shade for the blurred-cover fallback: a bright cover would otherwise wash out the text -->
+                <Rectangle x:Name="HeroSoftShade" Fill="#0E0E12" Opacity="0" />
                 <Rectangle>
                     <Rectangle.Fill>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                             <GradientStop Color="#800E0E12" Offset="0" />
-                            <GradientStop Color="#330E0E12" Offset="0.2" />
+                            <GradientStop Color="#4D0E0E12" Offset="0.2" />
                             <GradientStop Color="#9E0E0E12" Offset="0.55" />
                             <GradientStop Color="#D90E0E12" Offset="1" />
                         </LinearGradientBrush>
