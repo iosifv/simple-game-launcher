@@ -241,6 +241,12 @@
             <Separator />
             <MenuItem Header="Show in File Explorer" Tag="reveal" Click="Menu_Click" />
             <Separator />
+            <!-- "Hide" / "Show again" (set in Tile_ContextMenuOpening): only the Hidden filter lists hidden games -->
+            <MenuItem Header="Hide" Tag="hide" Click="Menu_Click">
+                <MenuItem.Icon>
+                    <TextBlock Text="&#xED1A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" />
+                </MenuItem.Icon>
+            </MenuItem>
             <!-- Moves the shortcut file to the Recycle Bin after a confirmation (DeleteShortcut) -->
             <MenuItem Header="Delete…" Tag="delete" Click="Menu_Click" Foreground="{StaticResource DangerBrush}">
                 <MenuItem.Icon>
@@ -383,6 +389,9 @@
                                 <TextBlock x:Name="TagIcon" Text="&#xE8EC;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
                                            Foreground="{Binding Foreground, ElementName=T}" VerticalAlignment="Center" Margin="0,1,6,0"
                                            Visibility="{Binding IsTag, Converter={StaticResource BoolVis}}" />
+                                <TextBlock Text="&#xED1A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                                           Foreground="{Binding Foreground, ElementName=T}" VerticalAlignment="Center" Margin="0,1,6,0"
+                                           Visibility="{Binding IsHidden, Converter={StaticResource BoolVis}}" />
                                 <TextBlock x:Name="T" Text="{Binding Label}" FontSize="12.5"
                                            Foreground="{StaticResource SecondaryBrush}" />
                             </StackPanel>
@@ -791,6 +800,9 @@
                                                             <TextBlock Text="&#xE8EC;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
                                                                        Foreground="{Binding Foreground, ElementName=L}" VerticalAlignment="Center"
                                                                        Margin="0,1,6,0" Visibility="{Binding IsTag, Converter={StaticResource BoolVis}}" />
+                                                            <TextBlock Text="&#xED1A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                                                                       Foreground="{Binding Foreground, ElementName=L}" VerticalAlignment="Center"
+                                                                       Margin="0,1,6,0" Visibility="{Binding IsHidden, Converter={StaticResource BoolVis}}" />
                                                             <TextBlock x:Name="L" Text="{Binding Label}" FontSize="13" />
                                                         </StackPanel>
                                                         <TextBlock Text="{Binding Note}" FontSize="11" Foreground="{StaticResource MutedBrush}"

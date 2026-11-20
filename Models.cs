@@ -69,6 +69,8 @@ namespace GameLauncher
         public string PlayTip => HasTrainer ? "Play  ·  Ctrl+click: play with trainer" : "Play";
         public List<string> Tags { get => _tags; set { _tags = value ?? new List<string>(); Raise(nameof(Tags)); Raise(nameof(SubText)); } }
         public DateTime? LastPlayed { get => _lastPlayed; set { if (Set(ref _lastPlayed, value)) Raise(nameof(SubText)); } }
+        /// <summary>Hidden by the user (GameData.Hidden): only the "Hidden" filter shows it.</summary>
+        public bool Hidden { get; set; }
 
         bool _arranging, _isDragging;
         public bool Arranging { get => _arranging; set => Set(ref _arranging, value); }
@@ -111,6 +113,8 @@ namespace GameLauncher
     {
         /// <summary>Tag filters show a tag icon before the name (instead of a "#").</summary>
         public bool IsTag => Value.StartsWith("tag:", StringComparison.OrdinalIgnoreCase);
+        /// <summary>The "Hidden" filter shows a crossed-out eye before its name.</summary>
+        public bool IsHidden => Value == "hidden";
     }
 
     public class WallpaperRow : Notify
@@ -119,6 +123,7 @@ namespace GameLauncher
         public string Label { get; set; }
         public string Key { get; set; }
         public bool IsTag => Key?.StartsWith("tag:", StringComparison.OrdinalIgnoreCase) == true;
+        public bool IsHidden => Key == "hidden";
         public string Note { get; set; }
         public ImageSource Thumb { get; set; }
         public bool HasImage => Thumb != null;
@@ -140,6 +145,8 @@ namespace GameLauncher
         /// <summary>Custom cover used on portrait cards (a tall image).</summary>
         public string CustomCoverPortrait { get; set; }
         public bool NoCover { get; set; }
+        /// <summary>Hidden from every filter, search and the dice; listed only under the "Hidden" filter.</summary>
+        public bool Hidden { get; set; }
     }
 
     public class Settings

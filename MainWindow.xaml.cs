@@ -366,6 +366,7 @@ namespace GameLauncher
                 g.Folder = e.Folder;
                 g.Tags = d?.Tags?.ToList() ?? new List<string>();
                 g.LastPlayed = d?.LastPlayed;
+                g.Hidden = d?.Hidden == true;
                 if (changed)
                 {
                     g.LastWrite = e.LastWrite;
@@ -549,6 +550,9 @@ namespace GameLauncher
 
         bool Matches(GameItem g)
         {
+            // Hidden games appear only under the Hidden filter (and searching there searches just them).
+            if (Tab == "hidden") return g.Hidden && Score(g) > 0;
+            if (g.Hidden) return false;
             if (QNorm.Length > 0) return Score(g) > 0; // search looks across everything
             if (Tab == "games") return IsGame(g);
             if (Tab == "recent") return g.LastPlayed != null;
@@ -623,11 +627,13 @@ namespace GameLauncher
         List<TabVm> DefaultTabs()
         {
             var list = new List<TabVm> { new TabVm("Games", "games"), new TabVm("All", "all"), new TabVm("Recent", "recent") };
-            if (Games.Any(g => g.HasTrainer)) list.Add(new TabVm("With trainer", "trainer"));
-            foreach (var f in Games.Select(g => g.Folder).Where(f => !string.IsNullOrEmpty(f)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f))
+            var shown = Games.Where(g => !g.Hidden).ToList(); // no filter that would list only hidden games
+            if (shown.Any(g => g.HasTrainer)) list.Add(new TabVm("With trainer", "trainer"));
+            foreach (var f in shown.Select(g => g.Folder).Where(f => !string.IsNullOrEmpty(f)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(f => f))
                 list.Add(new TabVm(f, "folder:" + f));
-            foreach (var t in Games.SelectMany(g => g.Tags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t))
+            foreach (var t in shown.SelectMany(g => g.Tags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t))
                 list.Add(new TabVm(t, "tag:" + t)); // shown with a tag icon (TabStyle)
+            if (Games.Any(g => g.Hidden)) list.Add(new TabVm("Hidden", "hidden"));
             return list;
         }
 
@@ -704,9 +710,11 @@ namespace GameLauncher
                 StatusText.Text = $"Folder not found: {Store.S.Folder}  (Settings → Games folder)";
             else
             {
-                int games = Games.Count(IsGame), other = Games.Count - games;
+                var shown = Games.Where(g => !g.Hidden).ToList();
+                int games = shown.Count(IsGame), other = shown.Count - games, hidden = Games.Count - shown.Count;
                 StatusText.Text = $"{games} games" + (other > 0 ? $"  ·  {other} tools" : "")
-                                  + (Store.S.TrainersEnabled ? $"  ·  {Games.Count(g => g.HasTrainer)} with trainers" : "")
+                                  + (Store.S.TrainersEnabled ? $"  ·  {shown.Count(g => g.HasTrainer)} with trainers" : "")
+                                  + (hidden > 0 ? $"  ·  {hidden} hidden" : "")
                                   + $"  ·  watching {Store.S.Folder}";
             }
             HotkeyText.Text = _hotkeyOk ? $"{Store.S.Hotkey}  show / hide" : $"Hotkey {Store.S.Hotkey} is taken — change it in settings";
@@ -716,6 +724,7 @@ namespace GameLauncher
             EmptyText.Text = !_rootExists ? "Shortcuts folder not found"
                 : QNorm.Length > 0 ? $"No games match \"{Query}\""
                 : Tab == "recent" ? "Games you launch from here will show up in Recent"
+                : Tab == "hidden" ? "Nothing is hidden"
                 : "Drop a shortcut into the folder and it appears here";
         }
 
@@ -1059,10 +1068,26 @@ namespace GameLauncher
                     Reveal(g.FilePath);
                     break;
 
+                case "hide":
+                    SetHidden(g, !g.Hidden);
+                    break;
+
                 case "delete":
                     if (DeleteShortcut(g.Name, g.FilePath)) Games.Remove(g); // the folder watcher's rescan confirms it
                     break;
             }
+        }
+
+        /// <summary>Hide a game from every filter (it moves to the "Hidden" filter) or bring it back. The shortcut
+        /// file isn't touched.</summary>
+        void SetHidden(GameItem g, bool hidden)
+        {
+            Store.Game(g.Key).Hidden = hidden;
+            g.Hidden = hidden;
+            SaveSoon();
+            RebuildTabs(); // adds / removes the Hidden filter (leaving it when it empties)
+            RefreshView(keepSelection: false);
+            Flash(hidden ? $"Hid {g.Name}  ·  it's under the Hidden filter" : $"{g.Name} is back");
         }
 
         static void Reveal(string path)
@@ -1279,8 +1304,15 @@ namespace GameLauncher
             if ((sender as FrameworkElement)?.ContextMenu is not ContextMenu cm) return;
             var d = (sender as FrameworkElement).DataContext is GameItem g ? Store.Find(g.Key) : null;
             foreach (var top in cm.Items.OfType<MenuItem>())
+            {
                 if (top.Tag is "playtrainer" or "trainermenu")
                     top.Visibility = Store.S.TrainersEnabled ? Visibility.Visible : Visibility.Collapsed;
+                if (top.Tag is "hide" && (sender as FrameworkElement).DataContext is GameItem hg)
+                {
+                    top.Header = hg.Hidden ? "Show again" : "Hide";
+                    if (top.Icon is TextBlock icon) icon.Text = hg.Hidden ? "" : ""; // eye / crossed-out eye
+                }
+            }
             foreach (var mi in cm.Items.OfType<MenuItem>().SelectMany(m => m.Items.OfType<MenuItem>()))
             {
                 if (mi.Tag is not string tag || !tag.Contains(':')) continue;

@@ -16,6 +16,10 @@ To update, replace `GameLauncher.exe` with the new one. Your settings, covers an
 
 ## What's new
 
+- **Hide games** you don't want to see (right-click → Hide). They move to a **Hidden** filter, where Show again brings them back. The shortcut file stays where it is.
+- **Delete…** (right-click a game or launcher) moves the shortcut to the Recycle Bin after asking.
+- **Remembers where the window was**: same monitor, same size, or maximized, also with several monitors.
+- Tag filters show a **tag icon**.
 - **Play button on hover:** point at a game and a ▶ button appears. Click to play, Ctrl+click to play with the trainer.
 - **Random game dice** in the title bar: it rolls across your games and lands on one. Pick its colour in Settings.
 - **Card spacing** slider and **scroll one row at a time** (smooth mouse-wheel scrolling).
@@ -39,13 +43,15 @@ To update, replace `GameLauncher.exe` with the new one. Your settings, covers an
 - **Just start typing** to search by name, initials (`bmw` → Black Myth Wukong), tag or folder. Enter plays.
 - **Can't decide?** The dice in the title bar picks a random game from the filter you're on (and can start it for you).
 - **Launcher bar** with your store apps (Steam, Epic, EA, Battle.net, …) from a `Launchers` subfolder.
-- **Filters:** Games, All, Recent, With trainer, one tab per subfolder (e.g. `Tools`) and one per tag.
+- **Filters:** Games, All, Recent, With trainer, one tab per subfolder (e.g. `Tools`), one per tag, and Hidden.
 - **Global hotkey** (default `Win+Shift+G`) and a dark tray icon menu: the launcher is always one keypress away.
 - **Live folder watching:** add, remove or rename a shortcut and the grid updates within a second.
 
 **Make it yours**
 - **Arrange mode:** drag games, filter tabs and launchers into your own order. Alt+arrows nudge, Reset puts everything back A–Z.
 - **Tags** with a one-click tag editor.
+- **Hide** games without deleting anything: they only show up under the Hidden filter. **Delete…** sends a shortcut to the Recycle Bin (after asking).
+- The window opens where you left it, on the same monitor, at the same size or maximized.
 - **Wallpapers** per filter, with dim and blur. Adjustable card size, Mica window, start with Windows.
 - **Hover tips** (game names, play and trainer hints, button descriptions) can be switched off.
 
