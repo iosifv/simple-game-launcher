@@ -6,11 +6,11 @@
 
 **Your game shortcuts, as a launcher that looks like it belongs on a gaming PC.** Point it at a folder of `.lnk` / `.url` shortcuts and it becomes a fast, searchable wall of cover art. The window takes on the look of whatever game you're pointing at. No account, no store, no library import, no background services: one small exe.
 
-![Black Myth Wukong in focus: its artwork fills the window, its name sits above the filters and the highlights turn gold](docs/screenshots/main.jpg)
+![Black Myth Wukong in focus: its artwork as a banner across the top, its name above the filters and the highlights in gold](docs/screenshots/main.jpg)
 
 ## Why it rocks
 
-- 🎨 **Every game sets the mood.** Point at a game and the whole window fades to its Steam artwork, its name appears above the filters, and every highlight takes the colour of its cover.
+- 🎨 **Every game sets the mood.** Point at a game and its artwork appears as a big banner across the top with its name, and every highlight takes the colour of its cover.
 - ⚡ **Start typing, press Enter, you're playing.** Search by name, initials (`bmw` → Black Myth Wukong), tag or folder. A global hotkey brings it up from anywhere.
 - 🖼️ **Cover art finds itself.** Steam, the Microsoft Store and GOG are searched for you, in landscape or portrait. Or pick your own art for each game.
 - 🃏 **Cards that feel alive.** They lift, glow in their own colours and show a ▶ play button. The rest of the grid dims into a spotlight.
@@ -30,7 +30,10 @@ To update, replace `GameLauncher.exe` with the new one. Your settings, covers an
 
 ## What's new
 
-- **A new look.** The game you point at (or select) fills the window with its artwork and puts its name above the filters. The accent colour follows its cover. Very bright artwork is toned down automatically so text stays readable.
+- **A new look.** The game you point at (or select) shows its artwork as a big banner across the top, with its name in the corner, and the accent colour follows its cover. Very bright artwork is toned down automatically so text stays readable.
+- **Sharp artwork for every game:** Steam games use Steam's background art, others get large art from the Microsoft Store or GOG. A picture too small to look sharp is never stretched into a blur.
+- **Your own background art:** right-click a game → **Cover → Choose background art…** to use any picture.
+- **Soft scrolling:** cards fade out under the filter row instead of being cut off.
 - **Spotlight:** the other cards dim while you point at one. You choose how much (10–90%).
 - **Compact title bar:** just search, the dice and a **⋯** menu for settings, rescan, open folder and exit.
 - **Smoother play button:** its colour fades in and out.
@@ -42,7 +45,7 @@ Earlier in 1.0.4: hide games, Delete to the Recycle Bin, window position remembe
 
 ### Every game sets the mood
 
-Pointing at a game (or selecting it with the keyboard) fades the background to its wide Steam artwork. Games that aren't on Steam get a soft blur of their cover instead. The highlight colour glides to match the cover. Portrait cards use Steam's tall library art:
+Pointing at a game (or selecting it with the keyboard) shows its wide artwork as a banner across the top. Steam games use Steam's background art; other games get large art from the Microsoft Store or GOG. Got a game with no good art? Right-click it → **Cover → Choose background art…** and use any picture you like. The highlight colour glides to match the cover. Portrait cards use Steam's tall library art:
 
 ![Portrait cards with Hellraiser Revival in focus: its artwork behind the grid and a purple accent](docs/screenshots/portrait-cards.jpg)
 
@@ -63,9 +66,9 @@ Search, the random-game dice and one **⋯** menu. Everything else is a click aw
 
 Each part of the look has its own switch in **Settings → Look**. Here is each one switched off and on, with everything else the same:
 
-**Game art in the background.** The selected game's artwork fills the window, and its name and details appear above the filters.
+**Game art in the background.** The selected game's artwork becomes a banner across the top, with its name and details, and a dark wash of it fills the rest of the window.
 
-![Game art off: the plain window over the desktop. On: Black Myth Wukong's artwork behind everything, with its name above the filters](docs/screenshots/compare-hero.jpg)
+![Game art off: the plain window over the desktop. On: Black Myth Wukong's artwork as a banner across the top, with its name above the filters](docs/screenshots/compare-hero.jpg)
 
 **Accent colour from the game.** The selection ring and the active filter take the cover's colour instead of the default blue.
 

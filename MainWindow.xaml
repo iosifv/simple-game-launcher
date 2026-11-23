@@ -29,6 +29,14 @@
         <!-- Shadows App's AccentBrush in this window; replaced from code with a brush whose colour follows
              the game in focus (ApplyAccent). Always use it as DynamicResource here. -->
         <SolidColorBrush x:Key="AccentBrush" Color="#60CDFF" />
+        <!-- The hero banner fades out at the bottom, into the grid -->
+        <LinearGradientBrush x:Key="BannerFade" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="Black" Offset="0" />
+            <GradientStop Color="Black" Offset="0.5" />
+            <GradientStop Color="#50000000" Offset="0.72" />
+            <GradientStop Color="#18000000" Offset="0.86" />
+            <GradientStop Color="Transparent" Offset="1" />
+        </LinearGradientBrush>
         <sys:Boolean x:Key="CardTipOn">False</sys:Boolean>
         <CornerRadius x:Key="ArtCorner">6,6,0,0</CornerRadius>
         <Thickness x:Key="IconMargin">0</Thickness>
@@ -262,9 +270,12 @@
                 <Separator />
                 <MenuItem Header="Choose landscape image…" Tag="setcover:landscape" Click="Menu_Click" />
                 <MenuItem Header="Choose portrait image…" Tag="setcover:portrait" Click="Menu_Click" />
+                <!-- Background art items: shown only while "Game art in the background" is on -->
+                <MenuItem Header="Choose background art…" Tag="setbg" Click="Menu_Click" />
                 <Separator />
                 <MenuItem Header="Use automatic landscape cover" Tag="steamcover:landscape" Click="Menu_Click" />
                 <MenuItem Header="Use automatic portrait cover" Tag="steamcover:portrait" Click="Menu_Click" />
+                <MenuItem Header="Use automatic background art" Tag="autobg" Click="Menu_Click" />
                 <Separator />
                 <MenuItem Header="Icon only" Tag="nocover" Click="Menu_Click" />
             </MenuItem>
@@ -506,21 +517,44 @@
                    RenderOptions.BitmapScalingMode="HighQuality" IsHitTestVisible="False" />
             <Rectangle x:Name="WallpaperShade" Grid.RowSpan="5" Fill="#0E0E12" Opacity="0" IsHitTestVisible="False" />
 
-            <!-- Hero background: wide art of the game in focus, cross-faded between two images (ShowHero) -->
+            <!-- Hero background for the game in focus, two slots cross-faded by ShowHero. Each slot: the art as a dark
+                 ambient wash over the whole window, plus the whole artwork as a clear banner across the top that
+                 fades into the grid (banner height and the space above the filters: UpdateBannerLayout). -->
             <Grid x:Name="HeroLayer" Grid.RowSpan="5" Opacity="0" IsHitTestVisible="False" ClipToBounds="True">
-                <Image x:Name="HeroA" Stretch="UniformToFill" VerticalAlignment="Top" Opacity="0"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
-                <Image x:Name="HeroB" Stretch="UniformToFill" VerticalAlignment="Top" Opacity="0"
-                       RenderOptions.BitmapScalingMode="HighQuality" />
-                <!-- Extra shade for the blurred-cover fallback: a bright cover would otherwise wash out the text -->
+                <Grid x:Name="HeroA" Opacity="0">
+                    <Image x:Name="HeroAmbA" Stretch="UniformToFill" VerticalAlignment="Top" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <Rectangle Fill="#D40E0E12" />
+                    <Image x:Name="HeroBanA" Stretch="UniformToFill" VerticalAlignment="Top" ClipToBounds="True"
+                           RenderOptions.BitmapScalingMode="HighQuality" OpacityMask="{DynamicResource BannerFade}" />
+                </Grid>
+                <Grid x:Name="HeroB" Opacity="0">
+                    <Image x:Name="HeroAmbB" Stretch="UniformToFill" VerticalAlignment="Top" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <Rectangle Fill="#D40E0E12" />
+                    <Image x:Name="HeroBanB" Stretch="UniformToFill" VerticalAlignment="Top" ClipToBounds="True"
+                           RenderOptions.BitmapScalingMode="HighQuality" OpacityMask="{DynamicResource BannerFade}" />
+                </Grid>
+                <!-- Extra shade for bright art (measured in ShowHero): a bright picture would otherwise wash out the text -->
                 <Rectangle x:Name="HeroSoftShade" Fill="#0E0E12" Opacity="0" />
-                <Rectangle>
+                <!-- Behind the game's name and the filter row: keeps them readable over bright art while the top of
+                     the banner stays clear (placed by UpdateBannerLayout) -->
+                <Rectangle x:Name="HeroScrim" VerticalAlignment="Top" Height="0">
                     <Rectangle.Fill>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                            <GradientStop Color="#800E0E12" Offset="0" />
-                            <GradientStop Color="#4D0E0E12" Offset="0.2" />
-                            <GradientStop Color="#9E0E0E12" Offset="0.55" />
-                            <GradientStop Color="#D90E0E12" Offset="1" />
+                            <GradientStop Color="#000E0E12" Offset="0" />
+                            <GradientStop Color="#8C0E0E12" Offset="0.4" />
+                            <GradientStop Color="#C70E0E12" Offset="0.68" />
+                            <GradientStop Color="#590E0E12" Offset="0.86" />
+                            <GradientStop Color="#000E0E12" Offset="1" />
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- Keeps the title bar readable over the banner -->
+                <Rectangle Height="150" VerticalAlignment="Top">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#B30E0E12" Offset="0" />
+                            <GradientStop Color="#590E0E12" Offset="0.5" />
+                            <GradientStop Color="#000E0E12" Offset="1" />
                         </LinearGradientBrush>
                     </Rectangle.Fill>
                 </Rectangle>
@@ -653,17 +687,23 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <!-- Name of the game in focus, over the hero background (UpdateHeroInfo). Fixed height so the grid
-                 doesn't jump while pointing at different games. -->
-            <StackPanel x:Name="HeroInfo" Height="52" Margin="24,12,24,0" Visibility="Collapsed" IsHitTestVisible="False">
-                <TextBlock x:Name="HeroName" FontSize="22" FontWeight="SemiBold" TextTrimming="CharacterEllipsis">
-                    <TextBlock.Effect>
-                        <DropShadowEffect ShadowDepth="0" BlurRadius="10" Opacity="0.6" />
-                    </TextBlock.Effect>
-                </TextBlock>
-                <TextBlock x:Name="HeroSub" FontSize="12" Foreground="{StaticResource SecondaryBrush}" Margin="1,2,0,0"
-                           TextTrimming="CharacterEllipsis" />
-            </StackPanel>
+            <!-- Open space over the hero banner, with the name of the game in focus at its bottom (UpdateHeroInfo).
+                 Its height follows the banner (UpdateBannerLayout), not the game, so the grid doesn't jump. -->
+            <Grid x:Name="HeroInfo" Height="52" Margin="24,12,24,0" Visibility="Collapsed" IsHitTestVisible="False">
+                <StackPanel VerticalAlignment="Bottom">
+                    <TextBlock x:Name="HeroName" FontSize="26" FontWeight="SemiBold" TextTrimming="CharacterEllipsis">
+                        <TextBlock.Effect>
+                            <DropShadowEffect ShadowDepth="0" BlurRadius="12" Opacity="0.8" />
+                        </TextBlock.Effect>
+                    </TextBlock>
+                    <TextBlock x:Name="HeroSub" FontSize="12.5" Foreground="{StaticResource TextBrush}" Margin="1,2,0,0"
+                               TextTrimming="CharacterEllipsis">
+                        <TextBlock.Effect>
+                            <DropShadowEffect ShadowDepth="0" BlurRadius="8" Opacity="0.8" />
+                        </TextBlock.Effect>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
             </StackPanel>
 
             <!-- Filter tabs -->

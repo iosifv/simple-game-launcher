@@ -145,6 +145,8 @@ namespace GameLauncher
         /// <summary>Custom cover used on portrait cards (a tall image).</summary>
         public string CustomCoverPortrait { get; set; }
         public bool NoCover { get; set; }
+        /// <summary>Background art chosen by the user for the hero banner (a copy in covers\). Wins over everything automatic.</summary>
+        public string CustomHero { get; set; }
         /// <summary>Hidden from every filter, search and the dice; listed only under the "Hidden" filter.</summary>
         public bool Hidden { get; set; }
     }

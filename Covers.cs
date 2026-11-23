@@ -211,7 +211,7 @@ namespace GameLauncher
 
         /// <summary>Microsoft Store / Xbox games: Poster (2:3) for portrait, TitledHeroArt / SuperHeroArt (16:9) for landscape.
         /// Returns null when the store couldn't be reached.</summary>
-        public static async Task<List<ArtCandidate>> SearchMicrosoft(string term, int max = 5)
+        public static async Task<List<ArtCandidate>> SearchMicrosoft(string term, int max = 5, int wideWidth = 920, bool heroFirst = false)
         {
             try
             {
@@ -241,11 +241,13 @@ namespace GameLauncher
                             if (i.GetProperty("ImagePurpose").GetString() == purpose) return Https(i.GetProperty("Uri").GetString()) + $"?w={w}";
                         return null;
                     }
-                    var titled = Img("TitledHeroArt", 920);
-                    var hero = Img("SuperHeroArt", 920);
+                    var titled = Img("TitledHeroArt", wideWidth);
+                    var hero = Img("SuperHeroArt", wideWidth);
                     var poster = Img("Poster", 600);
+                    // heroFirst: the background banner wants the art without the logo on it (SuperHeroArt).
+                    if (heroFirst && hero != null) list.Add(new ArtCandidate("Microsoft Store", title, new[] { hero }, false));
                     if (titled != null) list.Add(new ArtCandidate("Microsoft Store", title, new[] { titled }, false));
-                    if (hero != null) list.Add(new ArtCandidate("Microsoft Store", title, new[] { hero }, false));
+                    if (!heroFirst && hero != null) list.Add(new ArtCandidate("Microsoft Store", title, new[] { hero }, false));
                     if (poster != null) list.Add(new ArtCandidate("Microsoft Store", title, new[] { poster }, true));
                     if (list.Select(c => c.Title).Distinct().Count() >= max) break;
                 }
@@ -310,6 +312,42 @@ namespace GameLauncher
             if (wide != null) await TryDownload(wide, StoreCachedPath(gameKey, false));
             if (tall != null) await TryDownload(tall, StoreCachedPath(gameKey, true));
             return ok;
+        }
+
+        public static string StoreHeroPath(string gameKey) =>
+            Path.Combine(Store.CoverDir, $"store_{Library.Normalize(gameKey)}_hero.jpg");
+
+        static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> NoStoreHero = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Large, wide art for the background banner of a game Steam doesn't have: the Microsoft Store's
+        /// logo-free hero art at 1920 px, else GOG's horizontal cover (exact name matches only). Cached as
+        /// covers\store_{key}_hero.jpg; misses are remembered for this session.</summary>
+        public static async Task<string> EnsureStoreHero(string gameKey, string name)
+        {
+            var path = StoreHeroPath(gameKey);
+            if (File.Exists(path)) return path;
+            if (NoStoreHero.ContainsKey(gameKey)) return null;
+            var key = Library.Normalize(name);
+            var ms = await SearchMicrosoft(name, 5, 1920, heroFirst: true);
+            var url = ms?.FirstOrDefault(c => !c.Tall && Library.Normalize(c.Title) == key)?.Urls[0];
+            if (url == null)
+                url = (await SearchGog(name))?.FirstOrDefault(c => !c.Tall && Library.Normalize(c.Title) == key)?.Urls[0];
+            if (url != null && await TryDownload(url, path)) return path;
+            NoStoreHero[gameKey] = true;
+            return null;
+        }
+
+        /// <summary>Full-size image, scaled down to at most maxWidth (never up, so PixelWidth tells how sharp it is).</summary>
+        public static BitmapSource LoadImageAtMost(string path, int maxWidth)
+        {
+            try
+            {
+                int w;
+                using (var s = File.OpenRead(path))
+                    w = BitmapDecoder.Create(s, BitmapCreateOptions.DelayCreation, BitmapCacheOption.None).Frames[0].PixelWidth;
+                return LoadImage(path, Math.Min(w, maxWidth)) as BitmapSource;
+            }
+            catch { return null; }
         }
 
         /// <summary>Image bytes, or null if missing / too small to be real art.</summary>

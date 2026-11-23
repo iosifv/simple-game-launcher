@@ -1004,6 +1004,36 @@ namespace GameLauncher
                     }
                     break;
                 }
+                case "setbg":
+                {
+                    var dlg = new Microsoft.Win32.OpenFileDialog
+                    {
+                        Title = $"Choose background art for {g.Name} (wide, ideally 1920 px or more)",
+                        Filter = "Images|*.jpg;*.jpeg;*.png;*.bmp;*.webp|All files|*.*"
+                    };
+                    if (!ShowDlg(dlg)) break;
+                    var d = Store.Game(g.Key);
+                    var ext = Path.HasExtension(dlg.FileName) ? Path.GetExtension(dlg.FileName) : ".jpg";
+                    var dest = Path.Combine(Store.CoverDir, $"custom_{Library.Normalize(g.Key)}_hero_{DateTime.Now.Ticks}{ext}");
+                    try { File.Copy(dlg.FileName, dest, true); }
+                    catch (Exception ex) { Flash("Couldn't save image: " + ex.Message); break; }
+                    TryDelete(d.CustomHero);
+                    d.CustomHero = dest;
+                    SaveSoon();
+                    RefreshHero(g);
+                    Flash($"Background art set for {g.Name}");
+                    break;
+                }
+                case "autobg":
+                {
+                    var d = Store.Game(g.Key);
+                    TryDelete(d.CustomHero);
+                    d.CustomHero = null;
+                    SaveSoon();
+                    RefreshHero(g);
+                    Flash($"{g.Name} uses automatic background art again");
+                    break;
+                }
                 case "findcover":
                 {
                     var pick = CoverPicker.Show(this, g.Name);
@@ -1312,6 +1342,13 @@ namespace GameLauncher
             {
                 if (top.Tag is "playtrainer" or "trainermenu")
                     top.Visibility = Store.S.TrainersEnabled ? Visibility.Visible : Visibility.Collapsed;
+                if (top.Header as string == "Cover")
+                    foreach (var sub in top.Items.OfType<FrameworkElement>())
+                        if (sub.Tag is "setbg" or "autobg")
+                        {
+                            sub.Visibility = Store.S.HeroBackground ? Visibility.Visible : Visibility.Collapsed;
+                            if (sub.Tag is "autobg") sub.IsEnabled = !string.IsNullOrEmpty(d?.CustomHero);
+                        }
                 if (top.Tag is "hide" && (sender as FrameworkElement).DataContext is GameItem hg)
                 {
                     top.Header = hg.Hidden ? "Show again" : "Hide";
@@ -2449,10 +2486,43 @@ namespace GameLauncher
             GamesList.SelectionChanged += (s, e) => FocusSoon();
             // Leaving the grid (not just a card: the gaps between cards keep the last one) goes back to the selection.
             GamesList.MouseLeave += (s, e) => { _hoverGame = null; FocusSoon(); Spotlight(null); };
+            HeroLayer.SizeChanged += (s, e) => UpdateBannerLayout();
+            LaunchersBar.SizeChanged += (s, e) => UpdateBannerLayout();
+            TabsList.SizeChanged += (s, e) => UpdateBannerLayout();
+            GamesList.AddHandler(ScrollViewer.ScrollChangedEvent, new ScrollChangedEventHandler((s, e) => UpdateTopFade()));
+            Loaded += (s, e) => UpdateBannerLayout();
             ApplyHeaderLook();
         }
 
         GameItem FocusGame => _hoverGame ?? GamesList.SelectedItem as GameItem;
+
+        /// <summary>After the background art of g changed: show it now if g is the game in focus.</summary>
+        void RefreshHero(GameItem g)
+        {
+            if (g != FocusGame && g != _heroGame) return;
+            _heroGame = null;
+            UpdateFocusLook();
+        }
+
+        const double TopFadeHeight = 44;
+        LinearGradientBrush _topFade;
+
+        /// <summary>Once the grid is scrolled, cards passing under the filter row fade out instead of being cut off
+        /// sharply. The fade grows with the first pixels of scrolling, so the top row looks normal at rest.</summary>
+        void UpdateTopFade()
+        {
+            double offset = GamesScroll?.VerticalOffset ?? 0;
+            if (offset <= 0.5) { GamesList.OpacityMask = null; return; }
+            if (_topFade == null)
+            {
+                _topFade = new LinearGradientBrush { MappingMode = BrushMappingMode.Absolute, StartPoint = new Point(0, 0) };
+                _topFade.GradientStops.Add(new GradientStop(Colors.Transparent, 0));
+                _topFade.GradientStops.Add(new GradientStop(Color.FromArgb(0x70, 0, 0, 0), 0.4));
+                _topFade.GradientStops.Add(new GradientStop(Colors.Black, 1));
+            }
+            _topFade.EndPoint = new Point(0, Math.Min(offset, TopFadeHeight));
+            GamesList.OpacityMask = _topFade;
+        }
 
         void FocusSoon()
         {
@@ -2472,14 +2542,44 @@ namespace GameLauncher
             if (g == _heroGame && (g == null || _heroShown != null)) return;
             _heroGame = g;
             int ver = ++_heroVer;
-            var img = g == null ? null : await HeroImageFor(g);
+            var (banner, ambient) = g == null ? (null, null) : await HeroImagesFor(g);
             if (ver != _heroVer) return;
-            ShowHero(img);
+            ShowHero(banner, ambient);
+        }
+
+        /// <summary>Steam's hero art is about 3.1:1. The banner shows all of it across the window's width; the space
+        /// above the filters (HeroInfo) grows so roughly the top three quarters of it stay clear of the cards.</summary>
+        void UpdateBannerLayout()
+        {
+            if (!IsLoaded) return;
+            double w = HeroLayer.ActualWidth, h = HeroLayer.ActualHeight;
+            if (w <= 0 || h <= 0) return;
+            double banner = Math.Min(w / 3.1, h * 0.55);
+            HeroBanA.Height = HeroBanB.Height = banner;
+            double top = HeroInfo.Visibility == Visibility.Visible
+                ? HeroInfo.TranslatePoint(new Point(0, 0), HeroLayer).Y : 0;
+            HeroInfo.Height = Math.Clamp(banner * 0.74 - top, 56, 260);
+            // Scrim from about the middle of the space above the filters down to the bottom of the filter row.
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (HeroInfo.Visibility != Visibility.Visible) { HeroScrim.Height = 0; return; }
+                double infoTop = HeroInfo.TranslatePoint(new Point(0, 0), HeroLayer).Y;
+                double tabsBottom = TabsList.TranslatePoint(new Point(0, TabsList.ActualHeight), HeroLayer).Y + 10;
+                double scrimTop = infoTop + HeroInfo.ActualHeight * 0.35;
+                HeroScrim.Margin = new Thickness(0, scrimTop, 0, 0);
+                // Dark down to the filter row, then a soft tail behind the first cards (no hard edge).
+                HeroScrim.Height = Math.Max(0, (tabsBottom - scrimTop) / 0.68);
+            }), DispatcherPriority.Loaded);
         }
 
         void UpdateHeroInfo(GameItem g)
         {
-            HeroInfo.Visibility = Store.S.HeroBackground ? Visibility.Visible : Visibility.Collapsed;
+            var vis = Store.S.HeroBackground ? Visibility.Visible : Visibility.Collapsed;
+            if (HeroInfo.Visibility != vis)
+            {
+                HeroInfo.Visibility = vis;
+                Dispatcher.BeginInvoke(new Action(UpdateBannerLayout), DispatcherPriority.Loaded);
+            }
             HeroName.Text = g?.Name ?? "";
             if (g == null) { HeroSub.Text = ""; return; }
             var parts = new List<string>();
@@ -2489,49 +2589,78 @@ namespace GameLauncher
             HeroSub.Text = string.Join("  ·  ", parts);
         }
 
-        /// <summary>Steam's wide library hero when the game is on Steam (downloaded once, cached in covers\), else the
-        /// cover's tiny copy stretched up — a soft blur of its colours. Null when there's no art at all.</summary>
-        async Task<ImageSource> HeroImageFor(GameItem g)
+        /// <summary>A banner image must be at least this many pixels wide; smaller art stretched across the window
+        /// looks smeared, so it's left out and only the dark ambient wash shows.</summary>
+        const int MinBannerPixels = 1000;
+
+        /// <summary>Art for the game in focus. Banner: the first sharp, wide picture of: Steam's library hero, the
+        /// Microsoft Store / GOG hero art (games Steam doesn't have), the custom landscape cover, the store's landscape
+        /// cover, the Steam header — null when none is sharp enough. Ambient: the banner, else the cover's tiny
+        /// blurred copy. Both null when the game has no art at all.</summary>
+        async Task<(ImageSource banner, ImageSource ambient)> HeroImagesFor(GameItem g)
         {
-            int? id = g.SteamAppId ?? Store.Find(g.Key)?.SteamAppId;
-            if (id != null && Store.Find(g.Key)?.NoCover != true)
+            var d = Store.Find(g.Key);
+            // Background art the user chose wins, whatever its size (their call).
+            if (!string.IsNullOrEmpty(d?.CustomHero) && File.Exists(d.CustomHero))
             {
-                var path = Covers.CachedHeroPath(id.Value);
-                if (!File.Exists(path) && Store.S.FetchCovers)
-                {
-                    await NetGate.WaitAsync();
-                    try { path = await Covers.EnsureSteamHero(id.Value); }
-                    finally { NetGate.Release(); }
-                }
-                if (path != null && File.Exists(path))
-                {
-                    if (!_heroCache.TryGetValue(path, out var img))
-                    {
-                        img = await Task.Run(() => Covers.LoadImage(path, 1920));
-                        if (_heroCache.Count > 24) _heroCache.Clear();
-                        _heroCache[path] = img;
-                    }
-                    if (img != null) return img;
-                }
+                if (!_heroCache.TryGetValue(d.CustomHero, out var mine))
+                    _heroCache[d.CustomHero] = mine = await Task.Run(() => Covers.LoadImageAtMost(d.CustomHero, 2560));
+                if (mine != null) return (mine, mine);
             }
-            return g.CoverFill;
+            if (d?.NoCover == true) return (null, null);
+            int? id = g.SteamAppId ?? d?.SteamAppId;
+            bool fetch = Store.S.FetchCovers;
+
+            async Task<string> Fetch(Func<Task<string>> get)
+            {
+                await NetGate.WaitAsync();
+                try { return await get(); }
+                finally { NetGate.Release(); }
+            }
+            static string Existing(string p) => !string.IsNullOrEmpty(p) && File.Exists(p) ? p : null;
+
+            var candidates = new List<Func<Task<string>>>();
+            if (id != null)
+                candidates.Add(async () => Existing(Covers.CachedHeroPath(id.Value))
+                                           ?? (fetch ? await Fetch(() => Covers.EnsureSteamHero(id.Value)) : null));
+            else
+                candidates.Add(async () => Existing(Covers.StoreHeroPath(g.Key))
+                                           ?? (fetch ? await Fetch(() => Covers.EnsureStoreHero(g.Key, g.Name)) : null));
+            candidates.Add(() => Task.FromResult(Existing(d?.CustomCover)));
+            candidates.Add(() => Task.FromResult(Existing(Covers.StoreCachedPath(g.Key, false))));
+            if (id != null) candidates.Add(() => Task.FromResult(Existing(Covers.CachedPath(id.Value))));
+
+            foreach (var get in candidates)
+            {
+                var path = await get();
+                if (path == null) continue;
+                if (!_heroCache.TryGetValue(path, out var img))
+                {
+                    img = await Task.Run(() => Covers.LoadImageAtMost(path, 1920));
+                    if (_heroCache.Count > 24) _heroCache.Clear();
+                    _heroCache[path] = img;
+                }
+                if (img is System.Windows.Media.Imaging.BitmapSource b && b.PixelWidth >= MinBannerPixels) return (img, img);
+            }
+            return (null, g.CoverFill);
         }
 
-        void ShowHero(ImageSource img)
+        /// <summary>Cross-fades to new art. banner null = no sharp wide picture: only the dark ambient wash shows.</summary>
+        void ShowHero(ImageSource banner, ImageSource ambient)
         {
-            _heroShown = img;
+            _heroShown = ambient;
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            if (img == null)
+            if (ambient == null)
             {
                 Animate(HeroLayer, OpacityProperty, 0, 300, ease);
                 return;
             }
-            // Bright art (a yellow Counter-Strike hero, a light cover blur) would wash out the text over it:
-            // the brighter the picture, the more extra shade.
-            Animate(HeroSoftShade, OpacityProperty, Math.Clamp((Brightness(img) - 0.22) * 1.5, 0, 0.62), 380, ease);
+            // Bright art (a yellow Counter-Strike hero) would wash out the text over it: the brighter, the more shade.
+            Animate(HeroSoftShade, OpacityProperty, Math.Clamp((Brightness(banner ?? ambient) - 0.2) * 1.4, 0, 0.55), 380, ease);
             var (front, back) = _heroFrontA ? (HeroA, HeroB) : (HeroB, HeroA);
             bool layerWasHidden = HeroLayer.Opacity < 0.01;
-            back.Source = img;
+            if (back == HeroA) { HeroAmbA.Source = ambient; HeroBanA.Source = banner; }
+            else { HeroAmbB.Source = ambient; HeroBanB.Source = banner; }
             if (layerWasHidden)
             {
                 front.BeginAnimation(OpacityProperty, null); front.Opacity = 0;
