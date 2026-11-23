@@ -4,138 +4,125 @@
 ![Windows 11](https://img.shields.io/badge/Windows-11-0078D4)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
 
-**Your game shortcuts, as a launcher that looks like it belongs on a gaming PC.** Point it at a folder of `.lnk` / `.url` shortcuts and it becomes a fast, searchable wall of cover art. The window takes on the look of whatever game you're pointing at. No account, no store, no library import, no background services: one small exe.
+**Your game shortcuts, as a launcher that looks like it belongs on a gaming PC.** Point it at a folder of game shortcuts and it becomes a fast, searchable wall of cover art that takes on the look of whatever game you point at. No account, no store, no library import: one small exe.
 
-![Black Myth Wukong in focus: its artwork as a banner across the top, its name above the filters and the highlights in gold](docs/screenshots/main.jpg)
+![Pointing at Hellraiser, Genshin Impact and Aragami 2: each card lifts, the others dim, the banner and the accent colour change with the game, then the dice picks a random game](docs/screenshots/demo.gif)
 
 ## Why it rocks
 
-- 🎨 **Every game sets the mood.** Point at a game and its artwork appears as a big banner across the top with its name, and every highlight takes the colour of its cover.
-- ⚡ **Start typing, press Enter, you're playing.** Search by name, initials (`bmw` → Black Myth Wukong), tag or folder. A global hotkey brings it up from anywhere.
-- 🖼️ **Cover art finds itself.** Steam, the Microsoft Store and GOG are searched for you, in landscape or portrait. Or pick your own art for each game.
-- 🃏 **Cards that feel alive.** They lift, glow in their own colours and show a ▶ play button. The rest of the grid dims into a spotlight.
-- 🎲 **Can't decide?** Roll the dice and let it pick.
-- 🧰 **Trainers built in.** Ctrl+Enter starts a game together with its trainer.
-- 🪶 **Light and native.** WPF on .NET 10, Windows 11 Mica, dark everywhere (even the tray menu). It never changes your shortcut files.
+- 🎨 **Every game sets the mood:** its artwork as a banner across the top, its colour on every highlight.
+- ⚡ **Type, Enter, play.** Search by name, initials (`bmw` → Black Myth Wukong), tag or folder; a global hotkey brings it up from anywhere.
+- 🖼️ **Art finds itself** on Steam, the Microsoft Store and GOG, or use your own pictures.
+- 🃏 **Cards that feel alive**, a **dice** for when you can't decide, and **trainers** built in.
+- 🪶 **Light and native:** Windows 11 dark look, never touches your shortcut files.
 
 ## Download
 
 1. Get **GameLauncher.exe** from the [latest release](https://github.com/iosifv/simple-game-launcher/releases/latest).
 2. Put it in a folder of its own, for example `Documents\Game Launcher`. It keeps its settings and cover art next to itself, so avoid `Program Files`.
-3. Double-click it. On first start it asks for your games folder: the folder with your game shortcuts.
+3. Double-click it. On first start it asks for your games folder (see below).
 
-It's a single file with everything included: no installer, nothing else to install. Windows may show a SmartScreen warning because the exe isn't signed: click **More info → Run anyway**.
+It's a single file with everything included: no installer, nothing else to install. To update, replace `GameLauncher.exe` with the new one; your settings and covers are kept.
 
-To update, replace `GameLauncher.exe` with the new one. Your settings, covers and wallpapers next to it are kept.
+## Getting started: your games folder
 
-## What's new
+The launcher shows whatever shortcuts are in one folder. Make a folder (for example `Documents\Games`) and put a shortcut to each game in it:
 
-- **A new look.** The game you point at (or select) shows its artwork as a big banner across the top, with its name in the corner, and the accent colour follows its cover. Very bright artwork is toned down automatically so text stays readable.
-- **Sharp artwork for every game:** Steam games use Steam's background art, others get large art from the Microsoft Store or GOG. A picture too small to look sharp is never stretched into a blur.
-- **Your own background art:** right-click a game → **Cover → Choose background art…** to use any picture.
-- **Soft scrolling:** cards fade out under the filter row instead of being cut off.
-- **Spotlight:** the other cards dim while you point at one. You choose how much (10–90%).
-- **Compact title bar:** just search, the dice and a **⋯** menu for settings, rescan, open folder and exit.
-- **Smoother play button:** its colour fades in and out.
-- Every part of the new look has its own switch in **Settings → Look**. Turn them all off for the classic look.
+| Where the game is | How to get a shortcut |
+| --- | --- |
+| **Steam** | In your Library, right-click the game → **Manage → Add desktop shortcut**, then move the new shortcut from the desktop into your games folder. |
+| **Epic Games** | In your Library, click **⋯** on the game → **Manage** → turn on **Desktop shortcut**, then move it into the folder. |
+| **Xbox / Microsoft Store, EA, Ubisoft, Battle.net and most others** | Open the **Start menu → All**, find the game and drag it into your games folder. |
+| **Any game's `.exe`** | Hold **Alt** while dragging the `.exe` into your games folder. That makes a shortcut instead of moving the file. |
 
-Earlier in 1.0.4: hide games, Delete to the Recycle Bin, window position remembered per monitor, tag icons.
+Optional subfolders inside your games folder:
+
+```
+Games\
+├─ Some Game.lnk        ← every shortcut here is a game
+├─ Launchers\           ← Steam, Epic, EA app, … shown as buttons along the top
+├─ z\                   ← trainers, matched to games by name
+└─ Tools\               ← any other subfolder gets its own filter tab
+```
+
+Add, remove or rename a shortcut and the launcher updates within a second. It only reads your shortcuts: it never changes them (the one exception is **Delete…**, which asks first and moves the file to the Recycle Bin).
+
+## What's new in 1.0.6
+
+Big artwork banners for every game: Steam's background art, Microsoft Store / GOG art for everything else, or your own picture (**Cover → Choose background art…**). Plus a soft fade when scrolling and better readability over bright art. See the [releases page](https://github.com/iosifv/simple-game-launcher/releases) for every version.
 
 ## A tour
 
 ### Every game sets the mood
 
-Pointing at a game (or selecting it with the keyboard) shows its wide artwork as a banner across the top. Steam games use Steam's background art; other games get large art from the Microsoft Store or GOG. Got a game with no good art? Right-click it → **Cover → Choose background art…** and use any picture you like. The highlight colour glides to match the cover. Portrait cards use Steam's tall library art:
+Point at a game, or select it with the keyboard, and its wide artwork becomes a banner across the top with its name. A dark wash of it fills the rest of the window, and the highlight colour glides to match its cover.
 
-![Portrait cards with Hellraiser Revival in focus: its artwork behind the grid and a purple accent](docs/screenshots/portrait-cards.jpg)
+![Black Myth Wukong in focus: its artwork as a banner across the top, its name above the filters and the highlights in gold](docs/screenshots/main.jpg)
+
+Cards can be landscape or portrait (Steam's tall library art), with or without names:
+
+![Portrait cards with Hellraiser Revival in focus: its artwork as the banner and a purple accent](docs/screenshots/portrait-cards.jpg)
 
 ### Cards that feel alive
 
-- The card **lifts with a little spring**, a light **sweeps** across it and it **glows in its own colours**.
-- A **▶ play button** pops in: click to play, Ctrl+click to play with the trainer.
-- **Spotlight** dims the rest of the grid so the game you're pointing at stands out.
-- Cards without any cover get a soft glow in the colours of the game's icon.
-
-### A title bar that stays out of the way
-
-Search, the random-game dice and one **⋯** menu. Everything else is a click away (and Ctrl+, / F5 still work):
-
-![The ⋯ menu: Settings, Rescan folder, Open shortcuts folder, Exit](docs/screenshots/more-menu.jpg)
+The card lifts with a little spring, a light sweeps across it, it glows in its own colours and a **▶ play button** pops in (Ctrl+click plays with the trainer). **Spotlight** dims the rest of the grid. Cards without a cover get a soft glow in the colours of the game's icon.
 
 ### See the difference
 
-Each part of the look has its own switch in **Settings → Look**. Here is each one switched off and on, with everything else the same:
+Every part of the look has its own switch in **Settings → Look**. Here is each one off and on, with everything else the same.
 
-**Game art in the background.** The selected game's artwork becomes a banner across the top, with its name and details, and a dark wash of it fills the rest of the window.
+**Game art in the background**
 
 ![Game art off: the plain window over the desktop. On: Black Myth Wukong's artwork as a banner across the top, with its name above the filters](docs/screenshots/compare-hero.jpg)
 
-**Accent colour from the game.** The selection ring and the active filter take the cover's colour instead of the default blue.
+**Accent colour from the game:** the selection ring and the active filter take the cover's colour.
 
 ![Accent default: a blue ring and blue Games tab. From the game: a gold ring and gold Games tab for Black Myth Wukong](docs/screenshots/compare-accent.jpg)
 
-**Spotlight.** Point at a card and the rest of the grid steps back. You choose how much it dims, from 10 to 90%.
+**Spotlight:** the rest of the grid steps back; you choose how much (10–90%).
 
 ![Spotlight off: every card at full brightness while pointing at Hellraiser. On: the other cards dimmed](docs/screenshots/compare-spot.jpg)
 
-**Compact title bar.** Rescan, open folder and settings fold into one ⋯ menu.
+**Compact title bar:** rescan, open folder and settings fold into one ⋯ menu.
 
 ![Full title bar with rescan, folder and settings buttons, and the compact one with just the dice and a ⋯ menu](docs/screenshots/compare-header.jpg)
+
+![The ⋯ menu: Settings, Rescan folder, Open shortcuts folder, Exit](docs/screenshots/more-menu.jpg)
 
 ### Make it yours
 
 - **Arrange mode:** drag games, filter tabs and launchers into your own order. Alt+arrows nudge, Reset puts everything back A–Z.
-- **Tags** with a one-click editor. Each tag becomes its own filter, shown with a tag icon.
-- **Hide** games you don't want to see. They only show up under the **Hidden** filter, and **Show again** brings them back. **Delete…** moves a shortcut to the Recycle Bin, after asking.
-- **Landscape or portrait cards**, card size, spacing and names under the cards, all adjustable.
-- **Wallpapers** per filter, with dim and blur.
-- The window reopens **where you left it**: same monitor, same size, or maximized, even with several monitors.
+- **Tags** with a one-click editor; each tag becomes a filter.
+- **Hide** games you don't want to see (they move to a **Hidden** filter) or **Delete…** a shortcut to the Recycle Bin.
+- **Card size, shape, spacing**, names under the cards, **wallpapers** per filter.
+- The window reopens **where you left it**, even across several monitors.
 
 ![Arrange mode: drag handles on every game, filter tab and launcher](docs/screenshots/arrange.jpg)
 
-| Look: art, accent, spotlight, title bar | Cards, spacing, scrolling and the dice | General: trainers, tips and more |
+| Look | Cards and scrolling | General |
 | --- | --- | --- |
-| ![Settings → Look: game art in the background, accent colour from the game, spotlight with a dim slider, compact title bar](docs/screenshots/settings-look.jpg) | ![Settings: card size, shape, spacing, one-row scrolling and the random-game dice colour](docs/screenshots/settings.jpg) | ![Settings: games folder, hotkey, use trainers, trainer delay, show tips and other options](docs/screenshots/settings-general.jpg) |
+| ![Settings → Look: game art in the background, accent colour from the game, spotlight with a dim slider, compact title bar](docs/screenshots/settings-look.jpg) | ![Settings: card size, shape, names under the cards, spacing and one-row scrolling](docs/screenshots/settings.jpg) | ![Settings: games folder, hotkey, use trainers, trainer delay, show tips and other options](docs/screenshots/settings-general.jpg) |
 
 ### Find and start games fast
 
-- **Just start typing** to search. Enter plays, Ctrl+Enter plays with the trainer.
-- **The dice** picks a random game from the filter you're on (and can start it for you). Pick its colour in Settings.
-- **Launcher bar** with your store apps (Steam, Epic, EA, Battle.net, …) from a `Launchers` subfolder.
-- **Filters:** Games, All, Recent, With trainer, one per subfolder (e.g. `Tools`), one per tag, and Hidden.
-- **Global hotkey** (default `Win+Shift+G`) and a dark tray menu.
-- **Live folder watching:** add, remove or rename a shortcut and the grid updates within a second.
-- The mouse wheel can **scroll one row at a time**.
+- **Just start typing** to search; Enter plays.
+- **The dice** picks a random game from the filter you're on, and can start it for you.
+- **Filters:** Games, All, Recent, With trainer, one per subfolder, one per tag, and Hidden.
+- **Global hotkey** (default `Win+Shift+G`) and a tray icon; start with Windows if you like.
 
 ### Trainers
 
-- Put trainers in a `z` subfolder: `.exe` files with "trainer" in the name, or any shortcut (`.lnk` / `.url`). They're matched to games by name and get a TRAINER badge.
-- **Ctrl+Enter** (or Ctrl+click on ▶) starts the game, then the trainer after a delay you choose.
-- Don't use trainers? Switch them off in Settings: the badges, the "With trainer" filter and the trainer menus disappear.
-
-## Folder layout it understands
-
-```
-My Games Folder\
-├─ Some Game.lnk           ← games (any .lnk / .url)
-├─ Another Game.url
-├─ Launchers\              ← shown as the launcher bar
-├─ z\                      ← trainers (*Trainer*.exe, or any .lnk / .url), matched to games by name
-└─ Tools\                  ← any other subfolder becomes its own filter tab
-                             (Tools is excluded from the Games filter)
-```
-
-Shortcuts themselves are never modified: the launcher only reads them. The one exception is **Delete…**, which asks first and moves the file to the Recycle Bin.
+Put trainers in the `z` subfolder: `.exe` files with "trainer" in the name, or any shortcut. They're matched to games by name and get a TRAINER badge. **Ctrl+Enter** (or Ctrl+click on ▶) starts the game, then the trainer after a delay you choose. Don't use trainers? Switch them off in Settings and every trace of them disappears.
 
 ## Where the artwork comes from
 
 | Source | Used for |
 | --- | --- |
-| Your own image | Always wins. Set per shape (landscape / portrait) from the tile's **Cover** menu, or search with **Find cover online…**. |
+| Your own image | Always wins. Right-click a game → **Cover**: a landscape image, a portrait image and background art, each separately. Or search with **Find cover online…**. |
 | Steam | Steam games: the app id from a `steam://` link, otherwise an exact name match. Covers, tall library art and the wide background art. |
-| Microsoft Store, GOG | Games Steam doesn't have, by exact name. Also searchable in **Find cover online…**. |
+| Microsoft Store, GOG | Games Steam doesn't have, by exact name, including large background art. |
 
-Epic doesn't allow outside apps to search its store, but many Epic games are also on the Microsoft Store and are found there. Everything downloaded is cached in `covers\` next to the exe.
+Epic doesn't let outside apps search its store, but many Epic games are also on the Microsoft Store and are found there. Everything downloaded is cached in `covers\` next to the exe.
 
 ## Keyboard
 
@@ -150,16 +137,35 @@ Epic doesn't allow outside apps to search its store, but many Epic games are als
 | Ctrl+, | settings |
 | F5 | rescan |
 
-## Data
+## FAQ
 
-Everything the launcher remembers lives next to the exe: `launcher-data.json` (settings, tags, trainer choices, play history, custom order, hidden games), `covers\` and `wallpapers\`. To move it to another PC, copy the folder.
+**Windows says the app might be unsafe.**
+The exe isn't code-signed, so SmartScreen warns about it. Click **More info → Run anyway**. It's built from this repository by GitHub Actions; you can check the [workflow](.github/workflows/release.yml).
 
-## Requirements
+**A game has no cover, or the wrong one.**
+Right-click it → **Cover → Find cover online…** to search Steam, the Microsoft Store and GOG and pick a landscape and a portrait picture. You can also choose any image file, and set background art the same way.
 
-- Windows 11 (Windows 10 works without the Mica background), 64-bit
-- To build from source: .NET 10 SDK. The release exe needs nothing extra; a build with `--self-contained false` needs the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+**Something that isn't a game shows up under Games.**
+Move its shortcut into a subfolder such as `Tools` (it gets its own filter and stays out of Games), or right-click it → **Hide**.
 
-## Build and run
+**The hotkey doesn't work.**
+Another app probably uses it. Pick a different one in **Settings → General → Hotkey**; it tells you if a combination is taken.
+
+**Does it need the internet?**
+Only to download artwork, once per game. Turn off **Download cover art automatically** in Settings to keep it fully offline.
+
+**It's too flashy for me.**
+Switch any part of the look off in **Settings → Look**, and hover tips in **Settings → General**.
+
+**Where are my settings, and how do I back them up or move them?**
+Everything lives next to the exe: `launcher-data.json` (settings, tags, trainers, play history, order, hidden games), `covers\` and `wallpapers\`. Copy the whole folder.
+
+**How do I uninstall it?**
+Untick **Start with Windows** in Settings, exit from the tray icon, and delete the folder. Nothing else is installed.
+
+## For developers
+
+Requirements: Windows 11 (Windows 10 works without the Mica background), the .NET 10 SDK. The release exe is self-contained; a build with `--self-contained false` needs the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
 
 ```powershell
 dotnet run                                   # debug run
@@ -167,13 +173,9 @@ dotnet publish -c Release -r win-x64 --self-contained false `
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o app
 ```
 
-The published `app\GameLauncher.exe` is a single file. On first start it opens Settings so you can pick your games folder.
-
-## Releasing
-
-Push a version tag and GitHub Actions builds the self-contained exe and publishes the release:
+To release, push a version tag; GitHub Actions builds the exe and publishes the release:
 
 ```powershell
-git tag v1.0.6
-git push origin v1.0.6
+git tag v1.0.7
+git push origin v1.0.7
 ```
