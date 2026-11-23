@@ -364,6 +364,7 @@ namespace GameLauncher
                 g.FilePath = e.FilePath;
                 g.SortKey = e.SortKey;
                 g.SteamAppId = e.SteamAppId;
+                g.StoreName = e.StoreName;
                 g.Name = e.Name;
                 g.Folder = e.Folder;
                 g.Tags = d?.Tags?.ToList() ?? new List<string>();
@@ -622,6 +623,12 @@ namespace GameLauncher
         void RefreshView(bool keepSelection)
         {
             var sel = GamesList.SelectedItem;
+            var openFolder = Tab.StartsWith("folder:") ? Tab.Substring(7) : null;
+            if (!string.Equals(openFolder, GameItem.OpenFolder, OIC))
+            {
+                GameItem.OpenFolder = openFolder; // the cards of that folder leave its name out of their info line
+                foreach (var g in Games) if (g.Folder != null) g.RefreshSubText();
+            }
             _view.Refresh();
             if (keepSelection && sel != null && _view.Contains(sel)) GamesList.SelectedItem = sel;
             else SelectFirst();
@@ -2584,7 +2591,6 @@ namespace GameLauncher
             if (g == null) { HeroSub.Text = ""; return; }
             var parts = new List<string>();
             if (!string.IsNullOrEmpty(g.SubText)) parts.Add(g.SubText);
-            else parts.Add("Not played from here yet");
             if (g.HasTrainer) parts.Add("Trainer ready");
             HeroSub.Text = string.Join("  ·  ", parts);
         }

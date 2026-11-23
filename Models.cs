@@ -82,13 +82,21 @@ namespace GameLauncher
             {
                 var parts = new List<string>();
                 if (_lastPlayed is DateTime d) parts.Add("Played " + Relative(d));
-                if (!string.IsNullOrEmpty(_folder)) parts.Add(_folder);
+                if (!string.IsNullOrEmpty(_store)) parts.Add(_store);
+                // The folder name only when the filter isn't already that folder.
+                if (!string.IsNullOrEmpty(_folder) && !string.Equals(_folder, OpenFolder, StringComparison.OrdinalIgnoreCase)) parts.Add(_folder);
                 if (_tags.Count > 0) parts.Add(string.Join(", ", _tags));
-                if (parts.Count == 0)
-                    parts.Add(SteamAppId != null ? "Steam" : (_filePath != null && _filePath.EndsWith(".url", StringComparison.OrdinalIgnoreCase) ? "Link" : "Shortcut"));
                 return string.Join("  ·  ", parts);
             }
         }
+
+        string _store;
+        /// <summary>"Steam", "Epic", "Xbox", … from the shortcut's target (Library), null when unknown.</summary>
+        public string StoreName { get => _store; set { if (Set(ref _store, value)) Raise(nameof(SubText)); } }
+
+        /// <summary>The folder whose filter tab is open (null otherwise); SubText leaves that folder's name out.</summary>
+        public static string OpenFolder;
+        public void RefreshSubText() => Raise(nameof(SubText));
 
         static string Relative(DateTime d)
         {
