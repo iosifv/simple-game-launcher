@@ -47,9 +47,9 @@ Games\
 
 Add, remove or rename a shortcut and the launcher updates within a second. It only reads your shortcuts: it never changes them (the one exception is **Delete…**, which asks first and moves the file to the Recycle Bin).
 
-## What's new in 1.0.6
+## What's new in 1.0.7
 
-Big artwork banners for every game: Steam's background art, Microsoft Store / GOG art for everything else, or your own picture (**Cover → Choose background art…**). Plus a soft fade when scrolling and better readability over bright art. See the [releases page](https://github.com/iosifv/simple-game-launcher/releases) for every version.
+Each game now shows where it comes from (Steam, Epic, Xbox, GOG, EA, Ubisoft, Battle.net, HoYoPlay, …) under its name and on the banner, worked out from its shortcut. 1.0.6 brought the big artwork banners and your own background art (**Cover → Choose background art…**). See the [releases page](https://github.com/iosifv/simple-game-launcher/releases) for every version.
 
 ## A tour
 
