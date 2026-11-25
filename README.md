@@ -47,9 +47,9 @@ Games\
 
 Add, remove or rename a shortcut and the launcher updates within a second. It only reads your shortcuts: it never changes them (the one exception is **Delete…**, which asks first and moves the file to the Recycle Bin).
 
-## What's new in 1.0.7
+## What's new in 1.0.8
 
-Each game now shows where it comes from (Steam, Epic, Xbox, GOG, EA, Ubisoft, Battle.net, HoYoPlay, …) under its name and on the banner, worked out from its shortcut. 1.0.6 brought the big artwork banners and your own background art (**Cover → Choose background art…**). See the [releases page](https://github.com/iosifv/simple-game-launcher/releases) for every version.
+The launcher now updates itself: when a new version is out, an **Update** button appears at the top, and **Settings → Updates** can check now or install updates on its own while the launcher sits in the tray. 1.0.7 added where each game comes from (Steam, Epic, Xbox, GOG, …) under its name, and 1.0.6 brought the big artwork banners and your own background art (**Cover → Choose background art…**). See the [releases page](https://github.com/iosifv/simple-game-launcher/releases) for every version.
 
 ## A tour
 
@@ -179,6 +179,6 @@ dotnet publish -c Release -r win-x64 --self-contained false `
 To release, push a version tag; GitHub Actions builds the exe and publishes the release:
 
 ```powershell
-git tag v1.0.7
-git push origin v1.0.7
+git tag v1.0.8
+git push origin v1.0.8
 ```
