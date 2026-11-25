@@ -211,6 +211,11 @@ namespace GameLauncher
         public bool DiceStartsGame { get; set; }
         /// <summary>Hover tooltips (game names, play / trainer hints, button descriptions). Off: none anywhere.</summary>
         public bool ShowTips { get; set; } = true;
+        /// <summary>Look for a newer release on GitHub at start and once a day (Updater).</summary>
+        public bool CheckForUpdates { get; set; } = true;
+        /// <summary>Install a found update by itself, but only while the launcher is hidden.</summary>
+        public bool AutoInstallUpdates { get; set; } = false;
+        public DateTime? LastUpdateCheck { get; set; }
         /// <summary>Trainers on/off. Off: no game gets a trainer, so badges, the "With trainer" filter,
         /// trainer menus and Ctrl+Enter-with-trainer all go away.</summary>
         public bool TrainersEnabled { get; set; } = true;

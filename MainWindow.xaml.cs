@@ -99,6 +99,7 @@ namespace GameLauncher
             new WindowInteropHelper(this).EnsureHandle();
             StartWatching();
             _ = Rescan();
+            InitUpdates();
             // First run (or the folder is gone): open settings so a folder can be chosen.
             if (string.IsNullOrWhiteSpace(Store.S.Folder) || !Directory.Exists(Store.S.Folder))
                 Dispatcher.BeginInvoke(new Action(() => { if (SettingsPanel.Visibility != Visibility.Visible) ToggleSettings(); }),
@@ -2350,6 +2351,9 @@ namespace GameLauncher
             SpotlightText.Text = $"{s.SpotlightDim}%";
             SpotlightSlider.IsEnabled = s.Spotlight;
             StartupBox.IsChecked = StartupReg.IsEnabled();
+            CheckUpdatesBox.IsChecked = s.CheckForUpdates;
+            AutoInstallBox.IsChecked = s.AutoInstallUpdates;
+            UpdateUpdateUi();
             BuildWallpaperRows();
             _loadingSettings = false;
         }
@@ -2783,6 +2787,146 @@ namespace GameLauncher
             _heroGame = null; _heroShown = null; // re-evaluate now
             UpdateFocusLook();
             SaveSoon();
+        }
+
+        // ---------- updates ----------
+        // Updater talks to GitHub; this part decides when to ask and shows the result: the accent "Update" button in
+        // the title bar, the ⋯ menu item and Settings → Updates.
+
+        UpdateInfo _update;          // a newer release, once found
+        bool _checking, _installing;
+        string _updateError;
+        DispatcherTimer _updateTimer;
+
+        void InitUpdates()
+        {
+            // Look shortly after every start, then every hour whether a day has passed (the launcher lives in the tray for days).
+            _updateTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+            bool atStart = true;
+            _updateTimer.Tick += (s, e) =>
+            {
+                _updateTimer.Interval = TimeSpan.FromHours(1);
+                var last = Store.S.LastUpdateCheck;
+                bool due = atStart || last == null || DateTime.Now - last.Value > TimeSpan.FromHours(20);
+                atStart = false;
+                if (Store.S.CheckForUpdates && due)
+                    _ = CheckForUpdate(manual: false);
+                else if (_update != null) MaybeAutoInstall();
+            };
+            _updateTimer.Start();
+            IsVisibleChanged += (s, e) => { if (!IsVisible) MaybeAutoInstall(); };
+            UpdateUpdateUi();
+        }
+
+        public void AnnounceUpdated() =>
+            Dispatcher.BeginInvoke(new Action(() => Flash($"Updated to version {Updater.CurrentText}")), DispatcherPriority.ApplicationIdle);
+
+        async Task CheckForUpdate(bool manual)
+        {
+            if (_checking || _installing) return;
+            _checking = true; _updateError = null;
+            UpdateUpdateUi();
+            try
+            {
+                _update = await Updater.CheckAsync();
+                Store.S.LastUpdateCheck = DateTime.Now;
+                SaveSoon();
+                if (manual) Flash(_update != null ? $"Version {_update.Version.ToString(3)} is available" : "You have the latest version");
+            }
+            catch (Exception ex)
+            {
+                _updateError = "Couldn't check for updates";
+                if (manual) Flash(_updateError + ": " + ex.Message);
+            }
+            finally
+            {
+                _checking = false;
+                UpdateUpdateUi();
+            }
+            if (_update != null) MaybeAutoInstall();
+        }
+
+        void MaybeAutoInstall()
+        {
+            if (_update != null && Store.S.AutoInstallUpdates && !IsVisible && !_installing && Updater.CanSelfUpdate)
+                _ = InstallUpdate(hidden: true);
+        }
+
+        async Task InstallUpdate(bool hidden)
+        {
+            if (_update == null || _installing) return;
+            if (!Updater.CanSelfUpdate || _update.DownloadUrl == null)
+            {
+                // A development build (or a release without the exe): let the user get it from the page.
+                try { Process.Start(new ProcessStartInfo(_update.PageUrl ?? Updater.ReleasesPage) { UseShellExecute = true }); } catch { }
+                return;
+            }
+            _installing = true;
+            UpdateUpdateUi();
+            var version = _update.Version.ToString(3);
+            int lastPct = -1;
+            var progress = new Progress<double>(p =>
+            {
+                int pct = p < 0 ? -1 : (int)(p * 100);
+                if (pct == lastPct) return;
+                lastPct = pct;
+                Flash(pct < 0 ? $"Downloading version {version}…" : $"Downloading version {version}…  {pct}%");
+                UpdateBtnText.Text = pct < 0 ? "Downloading…" : $"Downloading {pct}%";
+            });
+            try
+            {
+                var exe = await Updater.DownloadAndInstallAsync(_update, progress);
+                Flash($"Restarting with version {version}…");
+                ((App)Application.Current).RestartInto(exe, hidden || !IsVisible);
+            }
+            catch (Exception ex)
+            {
+                _installing = false;
+                _updateError = "The update didn't install";
+                Flash($"{_updateError}: {ex.Message}");
+                UpdateUpdateUi();
+            }
+        }
+
+        async void UpdateNow_Click(object sender, RoutedEventArgs e)
+        {
+            if (_installing) return;
+            if (_update != null) await InstallUpdate(hidden: false);
+            else await CheckForUpdate(manual: true);
+        }
+
+        void UpdateOption_Click(object sender, RoutedEventArgs e)
+        {
+            if (_loadingSettings) return;
+            Store.S.CheckForUpdates = CheckUpdatesBox.IsChecked == true;
+            Store.S.AutoInstallUpdates = AutoInstallBox.IsChecked == true;
+            SaveSoon();
+            UpdateUpdateUi();
+            if (Store.S.CheckForUpdates && _update == null && Store.S.LastUpdateCheck == null) _ = CheckForUpdate(manual: false);
+        }
+
+        void UpdateUpdateUi()
+        {
+            if (VersionText == null) return;
+            string newer = _update?.Version.ToString(3);
+            UpdateBtn.Visibility = _update != null ? Visibility.Visible : Visibility.Collapsed;
+            if (!_installing) UpdateBtnText.Text = $"Update to {newer}";
+            UpdateBtn.ToolTip = Updater.CanSelfUpdate
+                ? $"Download version {newer} and restart. Settings and covers are kept."
+                : $"Open the download page for version {newer}";
+            UpdateMenuItem.Header = _update != null ? $"Update to {newer}" : "Check for updates";
+
+            VersionText.Text = $"Version {Updater.CurrentText}";
+            UpdateStateText.Text =
+                _installing ? $"Downloading version {newer}…"
+                : _checking ? "Checking…"
+                : _update != null ? $"Version {newer} is available."
+                : _updateError != null ? _updateError + "."
+                : Store.S.LastUpdateCheck is DateTime t ? $"Up to date · checked {(t.Date == DateTime.Today ? "today" : t.ToString("d MMM"))} at {t:HH:mm}"
+                : "Not checked yet";
+            UpdateNowBtn.Content = _update != null ? (Updater.CanSelfUpdate ? "Update now" : "Download") : "Check now";
+            UpdateNowBtn.IsEnabled = !_checking && !_installing;
+            AutoInstallBox.IsEnabled = CheckUpdatesBox.IsChecked == true;
         }
 
         // ---------- title bar ----------

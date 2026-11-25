@@ -588,6 +588,15 @@
                                VerticalAlignment="Center" Margin="0,0,14,0" IsHitTestVisible="False" />
                 </Grid>
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Shown only when a newer release is out (update section in MainWindow.xaml.cs) -->
+                    <Button x:Name="UpdateBtn" Style="{StaticResource AccentSmallBtn}" Margin="0,0,8,0" Visibility="Collapsed"
+                            WindowChrome.IsHitTestVisibleInChrome="True" Click="UpdateNow_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE896;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
+                                       VerticalAlignment="Center" Margin="0,1,7,0" />
+                            <TextBlock x:Name="UpdateBtnText" Text="Update" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
                     <!-- Random game: a die drawn in DiceBrush; it spins while rolling (RollDice) -->
                     <Button x:Name="DiceBtn" Style="{StaticResource HeaderBtn}" ToolTip="Random game" Click="Dice_Click">
                         <Viewbox x:Name="DiceIcon" Width="19" Height="19" RenderTransformOrigin="0.5,0.5">
@@ -626,6 +635,11 @@
                                 <MenuItem Header="Open shortcuts folder" Click="OpenFolder_Click">
                                     <MenuItem.Icon>
                                         <TextBlock Text="&#xE838;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" />
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem x:Name="UpdateMenuItem" Header="Check for updates" Click="UpdateNow_Click">
+                                    <MenuItem.Icon>
+                                        <TextBlock Text="&#xE896;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" />
                                     </MenuItem.Icon>
                                 </MenuItem>
                                 <Separator />
@@ -1076,6 +1090,29 @@
                                     <CheckBox x:Name="TipsBox" Content="Show tips when hovering" Margin="0,6,0,0" Click="Option_Click"
                                               ToolTip="Game names, play and trainer hints, and what each button does" />
                                     <CheckBox x:Name="StartupBox" Content="Start with Windows (in the tray)" Margin="0,6,0,0" Click="Option_Click" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Updates (Updater + the update section in MainWindow.xaml.cs) -->
+                            <Border Style="{StaticResource SectionCard}">
+                                <StackPanel>
+                                    <TextBlock Text="Updates" Style="{StaticResource SectionTitle}" />
+                                    <Grid Margin="0,8,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock x:Name="VersionText" FontSize="13" />
+                                            <TextBlock x:Name="UpdateStateText" Style="{StaticResource Hint}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Button x:Name="UpdateNowBtn" Grid.Column="1" Style="{StaticResource SmallBtn}" Content="Check now"
+                                                VerticalAlignment="Center" Margin="10,0,0,0" Click="UpdateNow_Click" />
+                                    </Grid>
+                                    <CheckBox x:Name="CheckUpdatesBox" Content="Check for updates automatically" Margin="0,12,0,0" Click="UpdateOption_Click" />
+                                    <CheckBox x:Name="AutoInstallBox" Content="Install them by themselves" Margin="0,6,0,0" Click="UpdateOption_Click" />
+                                    <TextBlock Style="{StaticResource Hint}" Margin="30,0,0,0"
+                                               Text="Only while the launcher is hidden, so it never restarts while you're using it. Settings and covers are kept." />
                                 </StackPanel>
                             </Border>
 

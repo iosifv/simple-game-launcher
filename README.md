@@ -22,7 +22,7 @@
 2. Put it in a folder of its own, for example `Documents\Game Launcher`. It keeps its settings and cover art next to itself, so avoid `Program Files`.
 3. Double-click it. On first start it asks for your games folder (see below).
 
-It's a single file with everything included: no installer, nothing else to install. To update, replace `GameLauncher.exe` with the new one; your settings and covers are kept.
+It's a single file with everything included: no installer, nothing else to install. It keeps itself up to date: when a new version is out, an **Update** button appears at the top, and one click downloads it and restarts. Your settings and covers are kept.
 
 ## Getting started: your games folder
 
@@ -151,8 +151,11 @@ Move its shortcut into a subfolder such as `Tools` (it gets its own filter and s
 **The hotkey doesn't work.**
 Another app probably uses it. Pick a different one in **Settings → General → Hotkey**; it tells you if a combination is taken.
 
+**How do I update it?**
+Click **Update to …** at the top when it shows up, or **Settings → Updates → Check now**. Turn on **Install them by themselves** to update while the launcher sits in the tray. Versions before 1.0.8 don't have the button: replace `GameLauncher.exe` with the new one once.
+
 **Does it need the internet?**
-Only to download artwork, once per game. Turn off **Download cover art automatically** in Settings to keep it fully offline.
+Only to download artwork, once per game, and to check GitHub for a new version. Turn off **Download cover art automatically** and **Check for updates automatically** in Settings to keep it fully offline.
 
 **It's too flashy for me.**
 Switch any part of the look off in **Settings → Look**, and hover tips in **Settings → General**.

@@ -18,7 +18,15 @@ namespace GameLauncher
         protected override void OnStartup(StartupEventArgs e)
         {
             string user = Environment.UserName;
+            bool updated = e.Args.Any(a => a.Equals("--updated", StringComparison.OrdinalIgnoreCase));
             _mutex = new Mutex(true, "GameLauncher.SingleInstance." + user, out bool first);
+            // Started by an update: the old copy may still be closing, so wait for it instead of handing over to it.
+            for (int i = 0; updated && !first && i < 40; i++)
+            {
+                _mutex.Dispose();
+                Thread.Sleep(250);
+                _mutex = new Mutex(true, "GameLauncher.SingleInstance." + user, out first);
+            }
             _showEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "GameLauncher.Show." + user);
             if (!first)
             {
@@ -53,9 +61,24 @@ namespace GameLauncher
             }) { IsBackground = true };
             listener.Start();
 
+            Updater.CleanUp();
             _win.Initialize();
             bool startInTray = e.Args.Any(a => a.Equals("--tray", StringComparison.OrdinalIgnoreCase));
             if (!startInTray) _win.ShowLauncher();
+            if (updated) _win.AnnounceUpdated();
+        }
+
+        /// <summary>After an update: let go of the single-instance lock, start the new exe and quit.</summary>
+        public void RestartInto(string exe, bool hidden)
+        {
+            Store.Save();
+            try { _mutex?.ReleaseMutex(); _mutex?.Dispose(); _mutex = null; } catch { }
+            Process.Start(new ProcessStartInfo(exe, "--updated" + (hidden ? " --tray" : ""))
+            {
+                UseShellExecute = false,
+                WorkingDirectory = Path.GetDirectoryName(exe)
+            });
+            ExitApp();
         }
 
         void SetupTray()
